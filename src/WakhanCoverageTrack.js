@@ -9,6 +9,7 @@ const HP2_POINT_COLOR = "#63A6D8";
 const AXIS_COLOR = "#3f464d";
 const GRID_COLOR = "#e5e8eb";
 const CENTER_COLOR = "#222222";
+const CHROM_BAND_COLOR = "#e7eaed";
 
 function clampCoverage(value, coverageMax) {
   if (!Number.isFinite(value)) {
@@ -206,6 +207,20 @@ function WakhanCoverageTrack(HGC, ...args) {
       return hp === 1 ? centerY - scaled : centerY + scaled;
     }
 
+    plotX(absPosition) {
+      const { leftAxisX, rightAxisX } = this.metrics();
+      const rawX = this._xScale(absPosition);
+      const rawWidth = Math.max(1, this.dimensions[0]);
+      return leftAxisX + (rawX / rawWidth) * (rightAxisX - leftAxisX);
+    }
+
+    plotAbsFromX(trackX) {
+      const { leftAxisX, rightAxisX } = this.metrics();
+      const plotWidth = Math.max(1, rightAxisX - leftAxisX);
+      const rawX = ((trackX - leftAxisX) / plotWidth) * this.dimensions[0];
+      return this._xScale.invert(rawX);
+    }
+
     addText(text, x, y, options = {}) {
       const label = new this.HGC.libraries.PIXI.Text(text, {
         fontSize: options.fontSize || "11px",
@@ -282,6 +297,34 @@ function WakhanCoverageTrack(HGC, ...args) {
       drawCopyTicks(this.hp2Ticks || [], 2);
     }
 
+    drawChromosomeBackground() {
+      const { top, leftAxisX, rightAxisX, height } = this.metrics();
+      if (!this.chromInfo || !this.chromInfo.cumPositions) {
+        return;
+      }
+
+      const bandColor = this.HGC.utils.colorToHex(CHROM_BAND_COLOR);
+      this.chromInfo.cumPositions.forEach((chromosome, index) => {
+        if (index % 2 !== 0) {
+          return;
+        }
+
+        const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
+        if (!Number.isFinite(chrLength)) {
+          return;
+        }
+
+        const startX = Math.max(leftAxisX, this.plotX(chromosome.pos));
+        const endX = Math.min(rightAxisX, this.plotX(chromosome.pos + chrLength));
+        if (endX <= leftAxisX || startX >= rightAxisX || endX <= startX) {
+          return;
+        }
+
+        this.bgGraphics.beginFill(bandColor, 0.85);
+        this.bgGraphics.drawRect(startX, top, endX - startX, height);
+      });
+    }
+
     updateVisibleData() {
       const fromX = this._xScale.invert(0);
       const toX = this._xScale.invert(this.dimensions[0]);
@@ -316,13 +359,19 @@ function WakhanCoverageTrack(HGC, ...args) {
 
       this.coverageGraphics.beginFill(hp1Color, 0.65);
       visibleRows.forEach((row) => {
-        const x = this._xScale((row.startAbs + row.endAbs) / 2);
+        const x = this.plotX((row.startAbs + row.endAbs) / 2);
+        if (x < this.metrics().leftAxisX || x > this.metrics().rightAxisX) {
+          return;
+        }
         this.coverageGraphics.drawCircle(x, this.yCoverage(row.hp1, 1), 1.2);
       });
 
       this.coverageGraphics.beginFill(hp2Color, 0.65);
       visibleRows.forEach((row) => {
-        const x = this._xScale((row.startAbs + row.endAbs) / 2);
+        const x = this.plotX((row.startAbs + row.endAbs) / 2);
+        if (x < this.metrics().leftAxisX || x > this.metrics().rightAxisX) {
+          return;
+        }
         this.coverageGraphics.drawCircle(x, this.yCoverage(row.hp2, 2), 1.2);
       });
     }
@@ -331,11 +380,16 @@ function WakhanCoverageTrack(HGC, ...args) {
       const hp1Color = this.HGC.utils.colorToHex(HP1_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_COLOR);
       const drawSegment = (segment, hp, color) => {
-        const x = this._xScale(segment.startAbs);
-        const width = Math.max(1, this._xScale(segment.endAbs) - x);
+        const { leftAxisX, rightAxisX } = this.metrics();
+        const xStart = Math.max(leftAxisX, this.plotX(segment.startAbs));
+        const xEnd = Math.min(rightAxisX, this.plotX(segment.endAbs));
+        const width = xEnd - xStart;
+        if (width <= 0) {
+          return;
+        }
         const y = this.yCoverage(segment.coverage, hp) - 2;
         this.segmentGraphics.beginFill(color, 0.95);
-        this.segmentGraphics.drawRect(x, y, width, 4);
+        this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
       };
       this.currentHp1Segments.forEach((segment) => drawSegment(segment, 1, hp1Color));
       this.currentHp2Segments.forEach((segment) => drawSegment(segment, 2, hp2Color));
@@ -354,6 +408,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
 
       this.updateVisibleData();
+      this.drawChromosomeBackground();
       this.drawAxes();
       this.drawCoveragePoints();
       this.drawCoverageSegments();
@@ -361,7 +416,11 @@ function WakhanCoverageTrack(HGC, ...args) {
 
     getMouseOverHtml(trackX, trackY) {
       this.mouseOverGraphics.clear();
-      const absX = this._xScale.invert(trackX);
+      const { leftAxisX, rightAxisX } = this.metrics();
+      if (trackX < leftAxisX || trackX > rightAxisX) {
+        return "";
+      }
+      const absX = this.plotAbsFromX(trackX);
       const coverageHit = this.currentCoverage.find((row) => {
         if (absX < row.startAbs || absX > row.endAbs) {
           return false;
