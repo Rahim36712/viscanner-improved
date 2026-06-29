@@ -7,7 +7,8 @@ import { default as higlassRegister } from "higlass-register/dist/higlass-regist
 // import { default as TranscriptsTrack } from "higlass-transcripts/es/TranscriptsTrack";
 // import { default as ClinvarTrack } from "higlass-clinvar/es/ClinvarTrack";
 import { default as TextTrack } from "higlass-text/es/TextTrack";
-import { default as ScannerResultTrack } from "smaht-higlass-misc/es/ScannerResultTrack";
+import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
+import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
 // import { default as OrthologsTrack } from "higlass-orthologs/es/OrthologsTrack";
 // import { default as GnomadTrack } from "higlass-gnomad/es/GnomadTrack";
 // import { default as GeneralVcfTrack } from 'higlass-general-vcf/es/GeneralVcfTrack';
@@ -46,6 +47,11 @@ export class HiglassBrowser extends React.PureComponent {
       name: "ScannerResultTrack",
       track: ScannerResultTrack,
       config: ScannerResultTrack.config,
+    });
+    higlassRegister({
+      name: "WakhanCoverageTrack",
+      track: WakhanCoverageTrack,
+      config: WakhanCoverageTrack.config,
     });
     // higlassRegister({
     //   name: "OrthologsTrack",

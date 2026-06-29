@@ -90,22 +90,15 @@
             },
             
             {
-              "type": "scannerResult",
+              "type": "wakhanCoverage",
               "options": {
-                "show_total_cn": true,
-                "yValue": "rdr",
-                "segmentColor": "#29ADB2",
-                "snpColor": "#cfcfcf",
-                "segmentHeight": 10,
-                "yAxisLabel": {
-                  "visible": true,
-                  "text": "Total copy number"
-                },
+                "coverageMax": 180,
+                "maxCoveragePoints": 12000,
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
-                "data":[]
+                "data": {}
               },
-              "height": 170,
-              "uid": "scanner-result-track-2",
+              "height": 330,
+              "uid": "wakhan-coverage-track",
               "width": 450
             }
           ],

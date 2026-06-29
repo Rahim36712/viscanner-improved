@@ -50,6 +50,21 @@ chrom	pos	5823PFC-B
 1	752566	1.0
 ```
 
+### WAKHAN HP1/HP2 coverage plotting
+
+When a WAKHAN output zip is uploaded, ViScanner uses one interactive HiGlass track for both HP1 and HP2. HP1 is drawn above the center line and HP2 is mirrored below it. The left axis is coverage depth, and the right axis is copy number inferred from the HP1/HP2 BED segment states.
+
+For WAKHAN output, upload a zip containing:
+
+```
+phase_corrected_coverage.csv
+*_copynumbers_segments_HP_1.bed
+*_copynumbers_segments_HP_2.bed
+baf.csv
+```
+
+The `phase_corrected_coverage.csv` file is interpreted as `chr`, `start`, `end`, `hp1`, `hp2`, and `unphased` coverage. It provides dense HP1 and HP2 coverage points inside the zoomable HiGlass track. The WAKHAN BED files are interpreted as `chr`, `start`, `end`, `coverage`, `copynumber_state`, and `confidence`; the `coverage` column provides the broader HP1 and HP2 median coverage segments, while `copynumber_state` supplies the right-side copy-number tick labels. Coverage values are clipped to `180` so extreme outlier bins do not flatten the main pattern.
+
 
 
 ## Available Scripts (when developing ViScanner)
