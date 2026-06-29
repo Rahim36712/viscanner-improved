@@ -74,8 +74,8 @@
               "options": {
                 "show_total_cn": false,
                 "yValue": "baf",
-                "segmentColor": "#0766AD",
-                "snpColor": "#cfcfcf",
+                "segmentColor": "#9A9D32",
+                "snpColor": "#9A9D32",
                 "segmentHeight": 10,
                 "yAxisLabel": {
                   "visible": true,
