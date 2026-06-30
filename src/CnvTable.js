@@ -45,7 +45,8 @@ export class CnvTable extends React.PureComponent {
       tablePage: 0,
       selectedChrom: ALL_CHROM,
       sortedBy: "",
-      sortedByOrder: "asc"
+      sortedByOrder: "asc",
+      tableType: "hiscanner",
     };
   }
 
@@ -100,6 +101,7 @@ export class CnvTable extends React.PureComponent {
       this.setState({
         displayedVariants: this.state.variants,
         selectedChrom: ALL_CHROM,
+        tablePage: 0,
       });
       return;
     }
@@ -114,16 +116,43 @@ export class CnvTable extends React.PureComponent {
     this.setState({
       displayedVariants: displayedVariants,
       selectedChrom: selectedChrom,
+      tablePage: 0,
     });
   };
 
   populateTable = (data) => {
     const variants = [];
+    const tableType = data && data.type === "wakhan" ? "wakhan" : "hiscanner";
+    const rows = tableType === "wakhan" ? data.rows : data;
 
     ChromosomeInfo("//s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
       // Now we can use the chromInfo object to convert
       .then((chromInfo) => {
-        data.forEach((variant) => {
+        rows.forEach((variant) => {
+          if (tableType === "wakhan") {
+            const totalCn =
+              Number.isFinite(variant.hp1CopyNumber) && Number.isFinite(variant.hp2CopyNumber)
+                ? variant.hp1CopyNumber + variant.hp2CopyNumber
+                : "-";
+            variants.push({
+              posAbs: chromInfo.chrToAbs([variant.chr, variant.start]),
+              chr: variant.chr,
+              start: variant.start,
+              end: variant.end,
+              startStr: format(",.0f")(variant.start),
+              endStr: format(",.0f")(variant.end),
+              hp1Coverage: variant.hp1Coverage,
+              hp1CopyNumber: variant.hp1CopyNumber,
+              hp1Confidence: variant.hp1Confidence,
+              hp2Coverage: variant.hp2Coverage,
+              hp2CopyNumber: variant.hp2CopyNumber,
+              hp2Confidence: variant.hp2Confidence,
+              total_cn: totalCn,
+              breakpoints: variant.breakpoints || "-",
+            });
+            return;
+          }
+
           const chrom = variant[0];
           const start = variant[1];
           const end = variant[2];
@@ -153,9 +182,84 @@ export class CnvTable extends React.PureComponent {
         this.setState({
           variants: variants,
           displayedVariants: variants,
+          selectedChrom: ALL_CHROM,
+          sortedBy: "",
+          sortedByOrder: "asc",
+          tablePage: 0,
+          tableType: tableType,
         });
       });
   };
+
+  formatCell = (value, formatter = ".3f") => {
+    if (value === "-" || value === undefined || value === null || Number.isNaN(value)) {
+      return "-";
+    }
+    return Number.isFinite(value) ? format(formatter)(value) : value;
+  };
+
+  sortableHeader = (label, sortKey) => (
+    <th scope="col">
+      {label}{" "}
+      <i
+        className="fas fa fa-sort fa-fw sort-table-icon"
+        onClick={() => this.sortTable(sortKey)}
+      ></i>
+    </th>
+  );
+
+  chromosomeHeader = () => (
+    <th scope="col">
+      Chrom.{" "}
+      <Select
+        className="basic-single d-inline-block"
+        value={this.state.selectedChrom}
+        onChange={this.selectChrom}
+        options={CHROMS}
+        closeMenuOnSelect={true}
+        placeholder="Select ..."
+        menuPortalTarget={document.body}
+        styles={{
+          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        }}
+      />
+    </th>
+  );
+
+  renderHiScannerHeader = () => (
+    <tr>
+      {this.chromosomeHeader()}
+      {this.sortableHeader("Start", "start")}
+      {this.sortableHeader("End", "end")}
+      {this.sortableHeader("major_cn", "major_cn")}
+      {this.sortableHeader("minor_cn", "minor_cn")}
+      {this.sortableHeader("total_cn", "total_cn")}
+      {this.sortableHeader("RDR", "rdr")}
+      {this.sortableHeader("BAF", "baf")}
+      <th className="text-center" scope="col">
+        Inspect region
+      </th>
+    </tr>
+  );
+
+  renderWakhanHeader = () => (
+    <tr>
+      {this.chromosomeHeader()}
+      {this.sortableHeader("Start", "start")}
+      {this.sortableHeader("End", "end")}
+      {this.sortableHeader("HP1 coverage", "hp1Coverage")}
+      {this.sortableHeader("HP1 CN", "hp1CopyNumber")}
+      {this.sortableHeader("HP1 confidence", "hp1Confidence")}
+      {this.sortableHeader("HP2 coverage", "hp2Coverage")}
+      {this.sortableHeader("HP2 CN", "hp2CopyNumber")}
+      {this.sortableHeader("HP2 confidence", "hp2Confidence")}
+      {this.sortableHeader("Total CN", "total_cn")}
+      <th scope="col">SV breakpoint IDs</th>
+      <th className="text-center" scope="col">
+        Inspect region
+      </th>
+    </tr>
+  );
 
   goToHiglass = (chr, start, end) => {
     const hgc = window.hgc.current;
@@ -196,6 +300,33 @@ export class CnvTable extends React.PureComponent {
     );
 
     variantsToDisplaySliced.forEach((variant) => {
+      if (this.state.tableType === "wakhan") {
+        cnvRows.push(
+          <tr>
+            <td>{variant.chr}</td>
+            <td>{variant.startStr}</td>
+            <td>{variant.endStr}</td>
+            <td>{this.formatCell(variant.hp1Coverage, ".2f")}</td>
+            <td>{this.formatCell(variant.hp1CopyNumber, ".1f")}</td>
+            <td>{this.formatCell(variant.hp1Confidence, ".3f")}</td>
+            <td>{this.formatCell(variant.hp2Coverage, ".2f")}</td>
+            <td>{this.formatCell(variant.hp2CopyNumber, ".1f")}</td>
+            <td>{this.formatCell(variant.hp2Confidence, ".3f")}</td>
+            <td>{this.formatCell(variant.total_cn, ".1f")}</td>
+            <td className="wakhan-breakpoints">{variant.breakpoints}</td>
+            <td className="text-center">
+              <i
+                className="fa fa-eye fas px-1 pointer"
+                onClick={() =>
+                  this.goToHiglass(variant.chr, variant.start, variant.end)
+                }
+              ></i>
+            </td>
+          </tr>
+        );
+        return;
+      }
+
       cnvRows.push(
         <tr>
           <td>{variant.chr}</td>
@@ -224,13 +355,13 @@ export class CnvTable extends React.PureComponent {
       ) : (
         <tbody>
           <tr>
-            <td colSpan={9} className="text-center p-5">
+            <td colSpan={this.state.tableType === "wakhan" ? 12 : 9} className="text-center p-5">
               <span className="text-secondary">
                 <i className="fa fa-info-circle fas"></i>
               </span>
               <br />
               <span>
-                Please upload the visualization output file from HiScanner
+                Please upload the visualization output file
               </span>
             </td>
           </tr>
@@ -284,7 +415,9 @@ export class CnvTable extends React.PureComponent {
           </div>
         </div>
 
-        <div className="h3">Variant browser</div>
+        <div className="h3">
+          {this.state.tableType === "wakhan" ? "WAKHAN segment browser" : "Variant browser"}
+        </div>
 
         <div className="d-flex flex-row-reverse mb-2">
           {navButtons}
@@ -295,75 +428,7 @@ export class CnvTable extends React.PureComponent {
             <div className="table-responsive-lg">
               <table className="table table-hover table-sm">
                 <thead className="sticky-table-header bg-white">
-                  <tr>
-                    <th scope="col">
-                      Chrom.{" "}
-                      <Select
-                        className="basic-single d-inline-block"
-                        value={this.state.selectedChrom}
-                        onChange={this.selectChrom}
-                        options={CHROMS}
-                        closeMenuOnSelect={true}
-                        placeholder="Select ..."
-                        menuPortalTarget={document.body}
-                        styles={{
-                          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                        }}
-                      />
-                    </th>
-                    <th scope="col">
-                      Start{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("start")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      End{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("end")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      major_cn{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("major_cn")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      minor_cn{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("minor_cn")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      total_cn{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("total_cn")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      RDR{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("rdr")}
-                      ></i>
-                    </th>
-                    <th scope="col">
-                      BAF{" "}
-                      <i
-                        className="fas fa fa-sort fa-fw sort-table-icon"
-                        onClick={() => this.sortTable("baf")}
-                      ></i>
-                    </th>
-                    <th className="text-center" scope="col">
-                      Inspect region
-                    </th>
-                  </tr>
+                  {this.state.tableType === "wakhan" ? this.renderWakhanHeader() : this.renderHiScannerHeader()}
                 </thead>
                 {tbody}
               </table>

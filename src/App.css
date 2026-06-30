@@ -98,6 +98,12 @@
   margin-bottom: 0;
 }
 
+.wakhan-breakpoints {
+  max-width: 320px;
+  white-space: normal;
+  word-break: break-word;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);

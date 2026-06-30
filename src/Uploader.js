@@ -113,9 +113,46 @@ function parseWakhanSegmentBed(v, haplotypeKey) {
         coverage: parseFloat(segment[3]),
         [haplotypeKey]: parseFloat(segment[4]),
         confidence: parseFloat(segment[5]),
+        breakpoints: segment.slice(6).join("\t") || "-",
       });
     });
   return rows;
+}
+
+function parseWakhanSegmentTableData(hp1Segments, hp2Segments) {
+  const rowsByRegion = new Map();
+  const addRows = (rows, haplotypeKey) => {
+    rows.forEach((row) => {
+      const key = [row.chr, row.start, row.end].join(":");
+      const existing = rowsByRegion.get(key) || {
+        chr: row.chr,
+        start: row.start,
+        end: row.end,
+        hp1Coverage: "-",
+        hp1CopyNumber: "-",
+        hp1Confidence: "-",
+        hp2Coverage: "-",
+        hp2CopyNumber: "-",
+        hp2Confidence: "-",
+        breakpoints: "-",
+      };
+
+      existing[haplotypeKey + "Coverage"] = row.coverage;
+      existing[haplotypeKey + "CopyNumber"] = row[haplotypeKey];
+      existing[haplotypeKey + "Confidence"] = row.confidence;
+      if (row.breakpoints && row.breakpoints !== "-") {
+        existing.breakpoints = row.breakpoints;
+      }
+      rowsByRegion.set(key, existing);
+    });
+  };
+
+  addRows(hp1Segments, "hp1");
+  addRows(hp2Segments, "hp2");
+
+  return Array.from(rowsByRegion.values()).sort(
+    (a, b) => a.chr.localeCompare(b.chr, undefined, { numeric: true }) || a.start - b.start
+  );
 }
 
 function parseWakhanCopyNumberData(hp1Text, hp2Text) {
@@ -268,7 +305,10 @@ async function readZip(blob, props) {
         entryTexts[hp1Filename],
         entryTexts[hp2Filename]
       );
-      props.populateTable(wakhanData);
+      props.populateTable({
+        type: "wakhan",
+        rows: parseWakhanSegmentTableData(hp1Segments, hp2Segments),
+      });
       if (entryTexts["phase_corrected_coverage.csv"]) {
         updateWakhanCoverageTracks(
           parseWakhanCoverageData(entryTexts["phase_corrected_coverage.csv"]),
