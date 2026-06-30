@@ -93,7 +93,10 @@
               "type": "wakhanCoverage",
               "options": {
                 "coverageMax": 180,
-                "maxCoveragePoints": 12000,
+                "maxCoveragePoints": 6000,
+                "showHp1": true,
+                "showHp2": true,
+                "showCoverage": true,
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "data": {}
               },

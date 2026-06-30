@@ -10,6 +10,7 @@ const AXIS_COLOR = "#3f464d";
 const GRID_COLOR = "#e5e8eb";
 const CENTER_COLOR = "#222222";
 const CHROM_BAND_COLOR = "#e7eaed";
+const COVERAGE_DOT_SIZE = 1.6;
 
 function clampCoverage(value, coverageMax) {
   if (!Number.isFinite(value)) {
@@ -76,6 +77,9 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.currentCoverage = [];
       this.currentHp1Segments = [];
       this.currentHp2Segments = [];
+      this.showHp1 = this.options.showHp1 !== false;
+      this.showHp2 = this.options.showHp2 !== false;
+      this.showCoverage = this.options.showCoverage !== false;
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
       this.coverageMax = this.options.coverageMax || 180;
@@ -132,6 +136,13 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.rerender(this.options);
     }
 
+    setVisibilityOptions(options) {
+      this.showHp1 = options.showHp1 !== false;
+      this.showHp2 = options.showHp2 !== false;
+      this.showCoverage = options.showCoverage !== false;
+      this.rerender(this.options);
+    }
+
     parseData(data) {
       this.coverage = [];
       this.hp1Segments = [];
@@ -179,6 +190,9 @@ function WakhanCoverageTrack(HGC, ...args) {
     rerender(options) {
       super.rerender(options);
       this.options = options;
+      this.showHp1 = this.showHp1 === undefined ? this.options.showHp1 !== false : this.showHp1;
+      this.showHp2 = this.showHp2 === undefined ? this.options.showHp2 !== false : this.showHp2;
+      this.showCoverage = this.showCoverage === undefined ? this.options.showCoverage !== false : this.showCoverage;
       if (this.options.data && !this.coverage.length) {
         this.parseData(this.options.data);
       }
@@ -273,16 +287,20 @@ function WakhanCoverageTrack(HGC, ...args) {
         rotation: Math.PI / 2,
         fontSize: "12px",
       });
-      this.addText("HP-1", rightAxisX + 10, top + 12, {
-        anchorX: 0,
-        fill: HP1_COLOR,
-        fontSize: "12px",
-      });
-      this.addText("HP-2", rightAxisX + 10, bottomY - 12, {
-        anchorX: 0,
-        fill: HP2_COLOR,
-        fontSize: "12px",
-      });
+      if (this.showHp1) {
+        this.addText("HP-1", rightAxisX + 10, top + 12, {
+          anchorX: 0,
+          fill: HP1_COLOR,
+          fontSize: "12px",
+        });
+      }
+      if (this.showHp2) {
+        this.addText("HP-2", rightAxisX + 10, bottomY - 12, {
+          anchorX: 0,
+          fill: HP2_COLOR,
+          fontSize: "12px",
+        });
+      }
 
       const drawCopyTicks = (ticks, hp) => {
         ticks.forEach((tick) => {
@@ -293,8 +311,12 @@ function WakhanCoverageTrack(HGC, ...args) {
           this.addText(tick.state, rightAxisX + 10, y, { anchorX: 0 });
         });
       };
-      drawCopyTicks(this.hp1Ticks || [], 1);
-      drawCopyTicks(this.hp2Ticks || [], 2);
+      if (this.showHp1) {
+        drawCopyTicks(this.hp1Ticks || [], 1);
+      }
+      if (this.showHp2) {
+        drawCopyTicks(this.hp2Ticks || [], 2);
+      }
     }
 
     drawChromosomeBackground() {
@@ -350,29 +372,49 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     drawCoveragePoints() {
+      if (!this.showCoverage) {
+        return;
+      }
       const hp1Color = this.HGC.utils.colorToHex(HP1_POINT_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_POINT_COLOR);
+      const halfDotSize = COVERAGE_DOT_SIZE / 2;
+      const { leftAxisX, rightAxisX, centerY, halfHeight } = this.metrics();
+      const rawWidth = Math.max(1, this.dimensions[0]);
+      const plotWidth = rightAxisX - leftAxisX;
+      const coverageMax = this.coverageMax;
       const visibleRows = sampleRows(
         this.currentCoverage,
-        this.options.maxCoveragePoints || 12000
+        this.options.maxCoveragePoints || 6000
       );
 
-      this.coverageGraphics.beginFill(hp1Color, 0.65);
+      this.coverageGraphics.beginFill(hp1Color, 0.58);
       visibleRows.forEach((row) => {
-        const x = this.plotX((row.startAbs + row.endAbs) / 2);
-        if (x < this.metrics().leftAxisX || x > this.metrics().rightAxisX) {
+        const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
+        const x = leftAxisX + (rawX / rawWidth) * plotWidth;
+        if (x < leftAxisX || x > rightAxisX) {
           return;
         }
-        this.coverageGraphics.drawCircle(x, this.yCoverage(row.hp1, 1), 1.2);
+        this.coverageGraphics.drawRect(
+          x - halfDotSize,
+          centerY - (clampCoverage(row.hp1, coverageMax) / coverageMax) * halfHeight - halfDotSize,
+          COVERAGE_DOT_SIZE,
+          COVERAGE_DOT_SIZE
+        );
       });
 
-      this.coverageGraphics.beginFill(hp2Color, 0.65);
+      this.coverageGraphics.beginFill(hp2Color, 0.58);
       visibleRows.forEach((row) => {
-        const x = this.plotX((row.startAbs + row.endAbs) / 2);
-        if (x < this.metrics().leftAxisX || x > this.metrics().rightAxisX) {
+        const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
+        const x = leftAxisX + (rawX / rawWidth) * plotWidth;
+        if (x < leftAxisX || x > rightAxisX) {
           return;
         }
-        this.coverageGraphics.drawCircle(x, this.yCoverage(row.hp2, 2), 1.2);
+        this.coverageGraphics.drawRect(
+          x - halfDotSize,
+          centerY + (clampCoverage(row.hp2, coverageMax) / coverageMax) * halfHeight - halfDotSize,
+          COVERAGE_DOT_SIZE,
+          COVERAGE_DOT_SIZE
+        );
       });
     }
 
@@ -391,8 +433,12 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.segmentGraphics.beginFill(color, 0.95);
         this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
       };
-      this.currentHp1Segments.forEach((segment) => drawSegment(segment, 1, hp1Color));
-      this.currentHp2Segments.forEach((segment) => drawSegment(segment, 2, hp2Color));
+      if (this.showHp1) {
+        this.currentHp1Segments.forEach((segment) => drawSegment(segment, 1, hp1Color));
+      }
+      if (this.showHp2) {
+        this.currentHp2Segments.forEach((segment) => drawSegment(segment, 2, hp2Color));
+      }
     }
 
     updateExistingGraphics() {
@@ -422,6 +468,9 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
       const absX = this.plotAbsFromX(trackX);
       const coverageHit = this.currentCoverage.find((row) => {
+        if (!this.showCoverage) {
+          return false;
+        }
         if (absX < row.startAbs || absX > row.endAbs) {
           return false;
         }
@@ -445,9 +494,10 @@ function WakhanCoverageTrack(HGC, ...args) {
         </table>`;
       }
 
-      const segmentHit = this.currentHp1Segments
-        .map((segment) => ({ ...segment, hp: "HP-1", hpIndex: 1 }))
-        .concat(this.currentHp2Segments.map((segment) => ({ ...segment, hp: "HP-2", hpIndex: 2 })))
+      const visibleSegments = []
+        .concat(this.showHp1 ? this.currentHp1Segments.map((segment) => ({ ...segment, hp: "HP-1", hpIndex: 1 })) : [])
+        .concat(this.showHp2 ? this.currentHp2Segments.map((segment) => ({ ...segment, hp: "HP-2", hpIndex: 2 })) : []);
+      const segmentHit = visibleSegments
         .find((segment) => {
           if (absX < segment.startAbs || absX > segment.endAbs) {
             return false;
@@ -489,11 +539,14 @@ WakhanCoverageTrack.config = {
   orientation: "1d-horizontal",
   name: "WAKHAN HP1/HP2 coverage",
   thumbnail: icon,
-  availableOptions: ["coverageMax", "chromSizesUrl", "data", "maxCoveragePoints"],
+  availableOptions: ["coverageMax", "chromSizesUrl", "data", "maxCoveragePoints", "showHp1", "showHp2", "showCoverage"],
   defaultOptions: {
     coverageMax: 180,
     data: {},
-    maxCoveragePoints: 12000,
+    maxCoveragePoints: 6000,
+    showHp1: true,
+    showHp2: true,
+    showCoverage: true,
   },
   optionsInfo: {},
 };

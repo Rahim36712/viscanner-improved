@@ -5,6 +5,73 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
 
+const DEFAULT_WAKHAN_VISIBILITY = {
+  showHp1: true,
+  showHp2: true,
+  showCoverage: true,
+};
+
+function updateWakhanTrackVisibility(visibility) {
+  const hgc = window.hgc && window.hgc.current;
+  if (!hgc || !hgc.api) {
+    return;
+  }
+
+  try {
+    const wakhanTrack = hgc.api.getTrackObject("aa", "wakhan-coverage-track");
+    if (wakhanTrack && wakhanTrack.setVisibilityOptions) {
+      wakhanTrack.setVisibilityOptions(visibility);
+    }
+  } catch (error) {
+    return;
+  }
+}
+
+function WakhanVisibilityControls() {
+  const [visibility, setVisibility] = React.useState(DEFAULT_WAKHAN_VISIBILITY);
+
+  React.useEffect(() => {
+    updateWakhanTrackVisibility(visibility);
+  }, [visibility]);
+
+  const toggleVisibility = (key) => {
+    setVisibility((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
+
+  return (
+    <div className="wakhan-visibility border p-2 mt-3">
+      <div className="wakhan-visibility-title">WAKHAN visibility</div>
+      <label className="wakhan-visibility-option">
+        <input
+          type="checkbox"
+          checked={visibility.showHp1}
+          onChange={() => toggleVisibility("showHp1")}
+        />
+        <span>HP1 plot</span>
+      </label>
+      <label className="wakhan-visibility-option">
+        <input
+          type="checkbox"
+          checked={visibility.showHp2}
+          onChange={() => toggleVisibility("showHp2")}
+        />
+        <span>HP2 plot</span>
+      </label>
+      <label className="wakhan-visibility-option">
+        <input
+          type="checkbox"
+          checked={visibility.showCoverage}
+          onChange={() => toggleVisibility("showCoverage")}
+        />
+        <span>Coverage points</span>
+      </label>
+    </div>
+  );
+}
+
 function App() {
   return (
     <div className="App">
@@ -35,6 +102,7 @@ function App() {
             <div className="border p-2 mt-3">
               <Facets />
             </div>
+            <WakhanVisibilityControls />
           </div>
           <div className="col-md-9">
             <div className="fixedHeight">

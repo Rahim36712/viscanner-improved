@@ -73,6 +73,31 @@
   cursor: pointer;
 }
 
+.wakhan-visibility {
+  background: #ffffff;
+}
+
+.wakhan-visibility-title {
+  color: #333333;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.wakhan-visibility-option {
+  align-items: center;
+  color: #333333;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.95rem;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.wakhan-visibility-option:last-child {
+  margin-bottom: 0;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
