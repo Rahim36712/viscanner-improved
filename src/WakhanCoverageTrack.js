@@ -140,7 +140,8 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.showHp1 = options.showHp1 !== false;
       this.showHp2 = options.showHp2 !== false;
       this.showCoverage = options.showCoverage !== false;
-      this.rerender(this.options);
+      this.updateExistingGraphics();
+      this.animate();
     }
 
     parseData(data) {
