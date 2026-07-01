@@ -8,6 +8,8 @@ async function decompressBlob(blob) {
   return await new Response(decompressedStream).text();
 }
 
+const RAR_SIGNATURE = "526172211A07";
+
 function normalizeChromosome(chrom) {
   return chrom.startsWith("chr") ? chrom : "chr" + chrom;
 }
@@ -15,6 +17,13 @@ function normalizeChromosome(chrom) {
 function fileBaseName(filename) {
   const parts = filename.split(/[\\/]/);
   return parts[parts.length - 1];
+}
+
+async function fileSignature(file) {
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
+    .join("");
 }
 
 function parseHiglassData(v) {
@@ -75,6 +84,142 @@ function parseSnpData(v, delimiter = "\t") {
   return higlassData;
 }
 
+function parseInfoField(infoText) {
+  const info = {};
+  if (!infoText) {
+    return info;
+  }
+  infoText.split(";").forEach((item) => {
+    if (!item) {
+      return;
+    }
+    const [key, ...valueParts] = item.split("=");
+    info[key] = valueParts.length ? valueParts.join("=") : true;
+  });
+  return info;
+}
+
+function parseSampleField(formatText, sampleText) {
+  const sample = {};
+  if (!formatText || !sampleText) {
+    return sample;
+  }
+  const keys = formatText.split(":");
+  const values = sampleText.split(":");
+  keys.forEach((key, index) => {
+    sample[key] = values[index];
+  });
+  return sample;
+}
+
+function parseBreakendAlt(alt) {
+  const match = alt && alt.match(/[\[\]]([^:\[\]]+):(\d+)[\[\]]/);
+  if (!match) {
+    return null;
+  }
+  return {
+    chr: normalizeChromosome(match[1]),
+    pos: parseInt(match[2], 10),
+  };
+}
+
+function parseNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseBreakpointIds(value) {
+  if (!value || value === "-") {
+    return [];
+  }
+  return Array.from(value.matchAll(/severus_[A-Za-z0-9_]+/g)).map(
+    (match) => match[0]
+  );
+}
+
+function parseSeverusVcf(v, options = {}) {
+  const passOnly = options.passOnly !== false;
+  const rawRecords = [];
+  const recordsById = new Map();
+
+  v.trim()
+    .split(/\r?\n/)
+    .forEach((line) => {
+      if (!line || line.startsWith("#")) {
+        return;
+      }
+      const segment = line.split("\t");
+      if (segment.length < 8) {
+        return;
+      }
+
+      const [chrom, posText, id, ref, alt, qual, filter, infoText, formatText, sampleText] = segment;
+      if (passOnly && filter !== "PASS") {
+        return;
+      }
+
+      const info = parseInfoField(infoText);
+      const sample = parseSampleField(formatText, sampleText);
+      const pos = parseInt(posText, 10);
+      const type = info.SVTYPE || (alt || "").replace(/[<>]/g, "") || "BND";
+      const end = parseNumber(info.END);
+      const svlen = parseNumber(info.SVLEN);
+      const bndMate = type === "BND" ? parseBreakendAlt(alt) : null;
+      const record = {
+        id,
+        chr: normalizeChromosome(chrom),
+        pos,
+        chr2: bndMate ? bndMate.chr : normalizeChromosome(chrom),
+        pos2: bndMate ? bndMate.pos : end || (svlen ? pos + Math.abs(svlen) : pos),
+        type,
+        svlen,
+        end,
+        filter,
+        mateId: info.MATE_ID || null,
+        strands: info.STRANDS || "-",
+        detailedType: info.DETAILED_TYPE || "-",
+        hp: info.HP || "-",
+        vaf: sample.VAF || "-",
+        dv: sample.DV || "-",
+        qual,
+        ref,
+        alt,
+      };
+
+      if (Number.isFinite(record.pos)) {
+        rawRecords.push(record);
+        recordsById.set(record.id, record);
+      }
+    });
+
+  const usedBndIds = new Set();
+  return rawRecords
+    .map((record) => {
+      if (record.type !== "BND" || !record.mateId) {
+        return record;
+      }
+
+      if (usedBndIds.has(record.id)) {
+        return null;
+      }
+
+      const mate = recordsById.get(record.mateId);
+      if (mate) {
+        usedBndIds.add(record.id);
+        usedBndIds.add(mate.id);
+        return {
+          ...record,
+          chr2: mate.chr,
+          pos2: mate.pos,
+          mateId: mate.id,
+        };
+      }
+      usedBndIds.add(record.id);
+      return record;
+    })
+    .filter(Boolean);
+}
+
 function parseWakhanCoverageData(v) {
   const rows = [];
   v.trim()
@@ -106,6 +251,7 @@ function parseWakhanSegmentBed(v, haplotypeKey) {
         return;
       }
       const segment = r.split("\t");
+      const breakpoints = segment.slice(6).join("\t") || "-";
       rows.push({
         chr: normalizeChromosome(segment[0]),
         start: parseInt(segment[1], 10),
@@ -113,10 +259,21 @@ function parseWakhanSegmentBed(v, haplotypeKey) {
         coverage: parseFloat(segment[3]),
         [haplotypeKey]: parseFloat(segment[4]),
         confidence: parseFloat(segment[5]),
-        breakpoints: segment.slice(6).join("\t") || "-",
+        breakpoints,
+        breakpointIds: parseBreakpointIds(breakpoints),
       });
     });
   return rows;
+}
+
+function parseWakhanMatchedSvIds(...segmentGroups) {
+  const ids = new Set();
+  segmentGroups.forEach((segments) => {
+    (segments || []).forEach((segment) => {
+      (segment.breakpointIds || []).forEach((id) => ids.add(id));
+    });
+  });
+  return Array.from(ids);
 }
 
 function parseWakhanSegmentTableData(hp1Segments, hp2Segments) {
@@ -225,6 +382,23 @@ function updateCopyNumberTracks(higlassData, includeBafSegments = true) {
     wakhanTrack.setData({});
   }
 
+  const wakhanSvTrack = getTrackObject(hgc, "wakhan-sv-track");
+  if (wakhanSvTrack) {
+    wakhanSvTrack.setData([]);
+  }
+
+  hgc.api.setViewConfig(viewconfCohort);
+}
+
+function updateWakhanStructuralVariationTrack(data) {
+  const hgc = window.hgc.current;
+  const viewconfCohort = hgc.api.getViewConfig();
+
+  const wakhanSvTrack = getTrackObject(hgc, "wakhan-sv-track");
+  if (wakhanSvTrack) {
+    wakhanSvTrack.setData(data || { variants: [], matchedIds: [] });
+  }
+
   hgc.api.setViewConfig(viewconfCohort);
 }
 
@@ -261,22 +435,24 @@ function updateBafSnpTrack(higlassData) {
   hgc.api.setViewConfig(viewconfCohort);
 }
 
-async function readZip(blob, props) {
-  const zipFileReader = new BlobReader(blob);
+function resetUploadSpinner() {
+  const spinner = document.getElementById("upload-spinner");
+  const overlay = document.getElementById("overlay");
+  if (spinner) {
+    spinner.classList.add("collapse");
+  }
+  if (overlay) {
+    overlay.style.display = "none";
+  }
+}
 
-  const zipReader = new ZipReader(zipFileReader);
-  const entries = await zipReader.getEntries();
-  const entryTexts = {};
+function showUploadError(message) {
+  resetUploadSpinner();
+  window.alert(message);
+}
 
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (entry.directory) {
-        return;
-      }
-      const writer = new TextWriter();
-      entryTexts[fileBaseName(entry.filename)] = await entry.getData(writer);
-    })
-  );
+function parseUploadedEntryTexts(entryTexts, props) {
+  let matchedSvIds = [];
 
   if (entryTexts["cna_short.txt"]) {
     props.populateTable(parseHiglassData(entryTexts["cna_short.txt"]));
@@ -301,6 +477,7 @@ async function readZip(blob, props) {
         entryTexts[hp2Filename],
         "hp2"
       );
+      matchedSvIds = parseWakhanMatchedSvIds(hp1Segments, hp2Segments);
       const wakhanData = parseWakhanCopyNumberData(
         entryTexts[hp1Filename],
         entryTexts[hp2Filename]
@@ -321,13 +498,82 @@ async function readZip(blob, props) {
     }
   }
 
+  const severusVcfFilename = Object.keys(entryTexts).find((filename) =>
+    filename.toLowerCase().endsWith(".vcf") &&
+    filename.toLowerCase().includes("severus")
+  );
+  if (severusVcfFilename) {
+    updateWakhanStructuralVariationTrack(
+      {
+        variants: parseSeverusVcf(entryTexts[severusVcfFilename], { passOnly: true }),
+        matchedIds: matchedSvIds,
+      }
+    );
+  } else {
+    updateWakhanStructuralVariationTrack({ variants: [], matchedIds: [] });
+  }
+
   if (entryTexts["snp.txt"]) {
     updateBafSnpTrack(parseSnpData(entryTexts["snp.txt"]));
   } else if (entryTexts["baf.csv"]) {
     updateBafSnpTrack(parseSnpData(entryTexts["baf.csv"], ","));
   }
+}
 
-  await zipReader.close();
+async function readZip(file, props) {
+  const signature = await fileSignature(file);
+  if (signature.startsWith(RAR_SIGNATURE)) {
+    throw new Error(
+      "This file is a RAR archive, not a real ZIP. Please create it using Windows 'Send to > Compressed (zipped) folder', or upload the BED/CSV/VCF files directly."
+    );
+  }
+
+  const zipFileReader = new BlobReader(file);
+  const zipReader = new ZipReader(zipFileReader);
+  const entryTexts = {};
+
+  try {
+    const entries = await zipReader.getEntries();
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (entry.directory) {
+          return;
+        }
+        const writer = new TextWriter();
+        entryTexts[fileBaseName(entry.filename)] = await entry.getData(writer);
+      })
+    );
+  } catch (error) {
+    throw new Error(
+      "ViScanner could not read this archive as a ZIP file. Please remake the archive as a normal .zip, or upload the BED/CSV/VCF files directly."
+    );
+  } finally {
+    await zipReader.close().catch(() => {});
+  }
+
+  parseUploadedEntryTexts(entryTexts, props);
+}
+
+async function readRawFiles(files, props) {
+  const entryTexts = {};
+  await Promise.all(
+    files.map(async (file) => {
+      entryTexts[fileBaseName(file.name)] = await file.text();
+    })
+  );
+
+  parseUploadedEntryTexts(entryTexts, props);
+}
+
+async function readUploadedFiles(files, props) {
+  if (!files.length) {
+    return;
+  }
+  if (files.length === 1 && fileBaseName(files[0].name).toLowerCase().endsWith(".zip")) {
+    await readZip(files[0], props);
+    return;
+  }
+  await readRawFiles(files, props);
 }
 
 const baseStyle = {
@@ -360,15 +606,15 @@ const rejectStyle = {
 
 const Uploader = (props) => {
   const onDrop = useCallback((acceptedFiles) => {
-    acceptedFiles.forEach((file) => {
-      readZip(file, props).then(() => {
+    readUploadedFiles(acceptedFiles, props)
+      .then(() => {
         setTimeout(() => {
-          const spinner = document.getElementById("upload-spinner");
-          spinner.classList.add("collapse");
-          document.getElementById("overlay").style.display = "none";
+          resetUploadSpinner();
         }, "2000");
+      })
+      .catch((error) => {
+        showUploadError(error.message || "ViScanner could not read the uploaded file.");
       });
-    });
   }, []);
 
   const onDropAccepted = () => {
@@ -379,8 +625,13 @@ const Uploader = (props) => {
 
   const { getRootProps, getInputProps, isFocused, isDragAccept, isDragReject } =
     useDropzone({
-      accept: { "application/zip": [".zip"] },
-      maxFiles: 1,
+      accept: {
+        "application/zip": [".zip"],
+        "text/csv": [".csv"],
+        "text/plain": [".txt", ".bed", ".vcf"],
+        "application/octet-stream": [".bed", ".vcf"],
+      },
+      maxFiles: 10,
       onDrop,
       onDropAccepted,
     });

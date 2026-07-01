@@ -9,6 +9,7 @@ import { default as higlassRegister } from "higlass-register/dist/higlass-regist
 import { default as TextTrack } from "higlass-text/es/TextTrack";
 import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
 import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
+import { default as WakhanStructuralVariationTrack } from "./WakhanStructuralVariationTrack";
 // import { default as OrthologsTrack } from "higlass-orthologs/es/OrthologsTrack";
 // import { default as GnomadTrack } from "higlass-gnomad/es/GnomadTrack";
 // import { default as GeneralVcfTrack } from 'higlass-general-vcf/es/GeneralVcfTrack';
@@ -52,6 +53,11 @@ export class HiglassBrowser extends React.PureComponent {
       name: "WakhanCoverageTrack",
       track: WakhanCoverageTrack,
       config: WakhanCoverageTrack.config,
+    });
+    higlassRegister({
+      name: "WakhanStructuralVariationTrack",
+      track: WakhanStructuralVariationTrack,
+      config: WakhanStructuralVariationTrack.config,
     });
     // higlassRegister({
     //   name: "OrthologsTrack",

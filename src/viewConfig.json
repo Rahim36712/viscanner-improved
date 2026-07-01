@@ -88,7 +88,31 @@
               "uid": "scanner-result-track-1",
               "width": 450
             },
-            
+            {
+              "type": "wakhanStructuralVariation",
+              "options": {
+                "maxVisibleVariants": 1200,
+                "minVariantLength": 50,
+                "passOnly": true,
+                "svMode": "matched",
+                "visibleTypes": {
+                  "DEL": true,
+                  "INV": true,
+                  "INS": true,
+                  "BND": true,
+                  "DUP": true,
+                  "sBND": true
+                },
+                "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
+                "data": {
+                  "variants": [],
+                  "matchedIds": []
+                }
+              },
+              "height": 230,
+              "uid": "wakhan-sv-track",
+              "width": 450
+            },
             {
               "type": "wakhanCoverage",
               "options": {
