@@ -386,6 +386,10 @@ function updateCopyNumberTracks(higlassData, includeBafSegments = true) {
   if (wakhanSvTrack) {
     wakhanSvTrack.setData([]);
   }
+  const wakhanHpSvTrack = getTrackObject(hgc, "wakhan-hp-sv-track");
+  if (wakhanHpSvTrack) {
+    wakhanHpSvTrack.setData([]);
+  }
 
   hgc.api.setViewConfig(viewconfCohort);
 }
@@ -397,6 +401,10 @@ function updateWakhanStructuralVariationTrack(data) {
   const wakhanSvTrack = getTrackObject(hgc, "wakhan-sv-track");
   if (wakhanSvTrack) {
     wakhanSvTrack.setData(data || { variants: [], matchedIds: [] });
+  }
+  const wakhanHpSvTrack = getTrackObject(hgc, "wakhan-hp-sv-track");
+  if (wakhanHpSvTrack) {
+    wakhanHpSvTrack.setData(data || { variants: [], matchedIds: [] });
   }
 
   hgc.api.setViewConfig(viewconfCohort);

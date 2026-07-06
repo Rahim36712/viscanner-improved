@@ -25,6 +25,7 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
   return visibility;
 }, {});
 const DEFAULT_SV_MODE = "matched";
+const DEFAULT_SHOW_HP_SV_TRACK = false;
 
 function updateWakhanTrackVisibility(visibility) {
   const hgc = window.hgc && window.hgc.current;
@@ -49,9 +50,35 @@ function updateSvTrackVisibility(options) {
   }
 
   try {
-    const svTrack = hgc.api.getTrackObject("aa", "wakhan-sv-track");
-    if (svTrack && svTrack.setVisibilityOptions) {
-      svTrack.setVisibilityOptions(options);
+    ["wakhan-sv-track", "wakhan-hp-sv-track"].forEach((trackUid) => {
+      const svTrack = hgc.api.getTrackObject("aa", trackUid);
+      if (svTrack && svTrack.setVisibilityOptions) {
+        svTrack.setVisibilityOptions(options);
+      }
+    });
+  } catch (error) {
+    return;
+  }
+}
+
+function updateHpSvTrackVisibility(showTrack) {
+  const hgc = window.hgc && window.hgc.current;
+  if (!hgc || !hgc.api) {
+    return;
+  }
+
+  try {
+    const viewConfig = hgc.api.getViewConfig();
+    const topTracks = viewConfig.views[0].tracks.top;
+    const hpSvTrackConfig = topTracks.find((track) => track.uid === "wakhan-hp-sv-track");
+    if (hpSvTrackConfig) {
+      hpSvTrackConfig.height = showTrack ? 160 : 1;
+      hpSvTrackConfig.options.showTrack = showTrack;
+      hgc.api.setViewConfig(viewConfig);
+    }
+    const hpSvTrack = hgc.api.getTrackObject("aa", "wakhan-hp-sv-track");
+    if (hpSvTrack && hpSvTrack.setVisibilityOptions) {
+      hpSvTrack.setVisibilityOptions({ showTrack });
     }
   } catch (error) {
     return;
@@ -106,10 +133,15 @@ function WakhanVisibilityControls() {
 function SvVisibilityControls() {
   const [visibility, setVisibility] = React.useState(DEFAULT_SV_VISIBILITY);
   const [svMode, setSvMode] = React.useState(DEFAULT_SV_MODE);
+  const [showHpSvTrack, setShowHpSvTrack] = React.useState(DEFAULT_SHOW_HP_SV_TRACK);
 
   React.useEffect(() => {
     updateSvTrackVisibility({ visibleTypes: visibility, svMode });
   }, [visibility, svMode]);
+
+  React.useEffect(() => {
+    updateHpSvTrackVisibility(showHpSvTrack);
+  }, [showHpSvTrack]);
 
   const toggleVisibility = (key) => {
     setVisibility((current) => ({
@@ -121,6 +153,14 @@ function SvVisibilityControls() {
   return (
     <div className="wakhan-visibility border p-2 mt-3">
       <div className="wakhan-visibility-title">SV visibility</div>
+      <label className="wakhan-visibility-option">
+        <input
+          type="checkbox"
+          checked={showHpSvTrack}
+          onChange={() => setShowHpSvTrack((current) => !current)}
+        />
+        <span>HP1/HP2 SV plot</span>
+      </label>
       <div className="sv-filter-mode">
         <label className="wakhan-visibility-option">
           <input

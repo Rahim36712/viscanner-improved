@@ -77,6 +77,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.currentVariants = [];
       this.hitRegions = [];
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
+      this.showTrack = this.options.showTrack !== false;
+      this.hpLaneMode = this.options.hpLaneMode === true;
       this.visibleTypes = {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
@@ -142,6 +144,9 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       if (options.svMode) {
         this.svMode = options.svMode;
       }
+      if (options.showTrack !== undefined) {
+        this.showTrack = options.showTrack !== false;
+      }
       this.resetCache();
       this.updateExistingGraphics();
       this.animate();
@@ -185,6 +190,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       super.rerender(options);
       this.options = options;
       this.svMode = this.svMode || this.options.svMode || DEFAULT_SV_MODE;
+      this.showTrack = this.showTrack === undefined ? this.options.showTrack !== false : this.showTrack;
+      this.hpLaneMode = this.options.hpLaneMode === true;
       this.visibleTypes = {
         ...DEFAULT_VISIBLE_TYPES,
         ...this.visibleTypes,
@@ -197,13 +204,14 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     metrics() {
-      const top = 38;
-      const bottom = 20;
+      const top = this.hpLaneMode ? 12 : 28;
+      const bottom = this.hpLaneMode ? 12 : 12;
       const leftAxisX = 72;
       const rightAxisX = this.dimensions[0] - 78;
       const height = Math.max(1, this.dimensions[1] - top - bottom);
       const baselineY = top + height - 10;
-      return { top, bottom, leftAxisX, rightAxisX, height, baselineY };
+      const centerY = top + height / 2;
+      return { top, bottom, leftAxisX, rightAxisX, height, baselineY, centerY };
     }
 
     plotX(absPosition) {
@@ -258,13 +266,18 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     drawAxes() {
-      const { top, leftAxisX, rightAxisX, height, baselineY } = this.metrics();
+      const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
       this.axisGraphics.clear();
       this.labelContainer.removeChildren();
 
       this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 1);
-      this.axisGraphics.moveTo(leftAxisX, baselineY);
-      this.axisGraphics.lineTo(rightAxisX, baselineY);
+      if (this.hpLaneMode) {
+        this.axisGraphics.moveTo(leftAxisX, centerY);
+        this.axisGraphics.lineTo(rightAxisX, centerY);
+      } else {
+        this.axisGraphics.moveTo(leftAxisX, baselineY);
+        this.axisGraphics.lineTo(rightAxisX, baselineY);
+      }
 
       this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 1);
       this.axisGraphics.moveTo(leftAxisX, top);
@@ -272,10 +285,22 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.axisGraphics.moveTo(rightAxisX, top);
       this.axisGraphics.lineTo(rightAxisX, top + height);
 
-      this.addText("Breakpoints", 20, top + height / 2, {
+      this.addText(this.hpLaneMode ? "HP SVs" : "Breakpoints", 20, top + height / 2, {
         rotation: -Math.PI / 2,
         fontSize: "12px",
       });
+      if (this.hpLaneMode) {
+        this.addText("HP-1", rightAxisX + 10, top + 15, {
+          anchorX: 0,
+          fill: TYPE_COLORS.DEL,
+          fontSize: "12px",
+        });
+        this.addText("HP-2", rightAxisX + 10, top + height - 15, {
+          anchorX: 0,
+          fill: "#2D7DD2",
+          fontSize: "12px",
+        });
+      }
     }
 
     updateVisibleData() {
@@ -292,7 +317,11 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
       const minLength = this.options.minVariantLength === undefined ? 50 : this.options.minVariantLength;
       const passOnly = this.options.passOnly !== false;
+      const endpointPadding = Math.max(5000, Math.abs(toX - fromX) * 0.2);
       this.currentVariants = this.variants.filter((variant) => {
+        if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
+          return false;
+        }
         if (passOnly && variant.filter !== "PASS") {
           return false;
         }
@@ -310,16 +339,17 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         ) {
           return false;
         }
-        const start = Math.min(variant.startAbs, variant.endAbs);
-        const end = Math.max(variant.startAbs, variant.endAbs);
-        return end >= fromX && start <= toX;
+        return (
+          (variant.startAbs >= fromX - endpointPadding && variant.startAbs <= toX + endpointPadding) ||
+          (variant.endAbs >= fromX - endpointPadding && variant.endAbs <= toX + endpointPadding)
+        );
       });
       this.previousFromX = fromX;
       this.previousToX = toX;
     }
 
     drawArc(variant, color) {
-      const { top, leftAxisX, rightAxisX, height, baselineY } = this.metrics();
+      const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
       const x1 = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
       const x2 = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.endAbs)));
       if (Math.abs(x2 - x1) < 1) {
@@ -328,8 +358,25 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
       const span = Math.abs(x2 - x1);
       const plotWidth = Math.max(1, rightAxisX - leftAxisX);
-      const arcLift = 28 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 38);
-      const apexY = Math.max(top + 8, baselineY - Math.min(height - 18, arcLift));
+      let startY = baselineY;
+      let endY = baselineY;
+      let apexY;
+      if (this.hpLaneMode) {
+        const laneHeight = Math.max(18, height / 2 - 12);
+        const laneLift = 12 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 10);
+        if (variant.hp === "1") {
+          startY = centerY - 4;
+          endY = centerY - 4;
+          apexY = Math.max(top + 7, startY - laneLift);
+        } else {
+          startY = centerY + 4;
+          endY = centerY + 4;
+          apexY = Math.min(top + height - 7, startY + laneLift);
+        }
+      } else {
+        const arcLift = 28 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 38);
+        apexY = Math.max(top + 8, baselineY - Math.min(height - 18, arcLift));
+      }
       const controlX = (x1 + x2) / 2;
       const steps = span > 280 ? 30 : 22;
 
@@ -338,7 +385,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         const t = i / steps;
         const inverse = 1 - t;
         const x = inverse * inverse * x1 + 2 * inverse * t * controlX + t * t * x2;
-        const y = inverse * inverse * baselineY + 2 * inverse * t * apexY + t * t * baselineY;
+        const y = inverse * inverse * startY + 2 * inverse * t * apexY + t * t * endY;
         if (i === 0) {
           this.variantGraphics.moveTo(x, y);
         } else {
@@ -353,22 +400,33 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         x2,
         controlX,
         apexY,
-        baselineY,
+        baselineY: startY,
       });
     }
 
     drawMarker(variant, color) {
-      const { top, leftAxisX, rightAxisX, baselineY } = this.metrics();
+      const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
       const x = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
+      let markerTop = top + 8;
+      let markerBottom = baselineY;
+      if (this.hpLaneMode) {
+        if (variant.hp === "1") {
+          markerTop = top + 7;
+          markerBottom = centerY - 4;
+        } else {
+          markerTop = centerY + 4;
+          markerBottom = top + height - 7;
+        }
+      }
       this.variantGraphics.lineStyle(1, color, MARKER_ALPHA);
-      this.variantGraphics.moveTo(x, top + 8);
-      this.variantGraphics.lineTo(x, baselineY);
+      this.variantGraphics.moveTo(x, markerTop);
+      this.variantGraphics.lineTo(x, markerBottom);
       this.hitRegions.push({
         variant,
         kind: "marker",
         x,
-        top: top + 8,
-        bottom: baselineY,
+        top: markerTop,
+        bottom: markerBottom,
       });
     }
 
@@ -402,6 +460,12 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.bgGraphics.clear();
       this.variantGraphics.clear();
 
+      if (!this.showTrack) {
+        this.axisGraphics.clear();
+        this.labelContainer.removeChildren();
+        return;
+      }
+
       if (!this.chromInfo) {
         this.loadingText.text = "Loading chromosome sizes...";
         return;
@@ -414,14 +478,21 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     getMouseOverHtml(trackX, trackY) {
-      const hit = this.hitRegions.find((region) => {
+      const hits = this.hitRegions
+        .map((region) => {
         if (region.kind === "marker") {
-          return Math.abs(trackX - region.x) <= 6 && trackY >= region.top && trackY <= region.bottom + 4;
+          if (Math.abs(trackX - region.x) <= 6 && trackY >= region.top && trackY <= region.bottom + 4) {
+            return {
+              region,
+              distance: Math.abs(trackX - region.x),
+            };
+          }
+          return null;
         }
         const minX = Math.min(region.x1, region.x2) - 4;
         const maxX = Math.max(region.x1, region.x2) + 4;
         if (trackX < minX || trackX > maxX) {
-          return false;
+          return null;
         }
         const t = Math.max(0, Math.min(1, (trackX - region.x1) / (region.x2 - region.x1)));
         const inverse = 1 - t;
@@ -429,8 +500,13 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           inverse * inverse * region.baselineY +
           2 * inverse * t * region.apexY +
           t * t * region.baselineY;
-        return Math.abs(trackY - y) <= 8;
-      });
+        const distance = Math.abs(trackY - y);
+        return distance <= 8 ? { region, distance } : null;
+      })
+        .filter(Boolean)
+        .sort((a, b) => a.distance - b.distance);
+
+      const hit = hits.length ? hits[0].region : null;
 
       if (!hit) {
         return "";
@@ -479,6 +555,8 @@ WakhanStructuralVariationTrack.config = {
     "maxVisibleVariants",
     "minVariantLength",
     "passOnly",
+    "hpLaneMode",
+    "showTrack",
     "svMode",
     "visibleTypes",
   ],
@@ -487,6 +565,8 @@ WakhanStructuralVariationTrack.config = {
     maxVisibleVariants: 1200,
     minVariantLength: 50,
     passOnly: true,
+    hpLaneMode: false,
+    showTrack: true,
     svMode: DEFAULT_SV_MODE,
     visibleTypes: DEFAULT_VISIBLE_TYPES,
   },

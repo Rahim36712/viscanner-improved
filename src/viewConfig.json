@@ -109,7 +109,7 @@
                   "matchedIds": []
                 }
               },
-              "height": 230,
+              "height": 200,
               "uid": "wakhan-sv-track",
               "width": 450
             },
@@ -124,8 +124,35 @@
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "data": {}
               },
-              "height": 330,
+              "height": 310,
               "uid": "wakhan-coverage-track",
+              "width": 450
+            },
+            {
+              "type": "wakhanStructuralVariation",
+              "options": {
+                "maxVisibleVariants": 1200,
+                "minVariantLength": 50,
+                "passOnly": true,
+                "hpLaneMode": true,
+                "showTrack": false,
+                "svMode": "matched",
+                "visibleTypes": {
+                  "DEL": true,
+                  "INV": true,
+                  "INS": true,
+                  "BND": true,
+                  "DUP": true,
+                  "sBND": true
+                },
+                "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
+                "data": {
+                  "variants": [],
+                  "matchedIds": []
+                }
+              },
+              "height": 1,
+              "uid": "wakhan-hp-sv-track",
               "width": 450
             }
           ],
