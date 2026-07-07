@@ -88,6 +88,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
       };
+      this.maxVariantLength = this.options.maxVariantLength || null;
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
       this.chromSizes = {};
@@ -154,6 +155,9 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       }
       if (options.hpFilter !== undefined) {
         this.hpFilter = normalizeHpFilter(options.hpFilter);
+      }
+      if (options.maxVariantLength !== undefined) {
+        this.maxVariantLength = options.maxVariantLength || null;
       }
       this.resetCache();
       this.updateExistingGraphics();
@@ -350,6 +354,13 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           return false;
         }
         if (variantLength(variant) < minLength) {
+          return false;
+        }
+        const maxLength = this.maxVariantLength;
+        if (maxLength && variant.chr === variant.chr2 && variantLength(variant) > maxLength) {
+          return false;
+        }
+        if (maxLength && variant.chr2 && variant.chr !== variant.chr2) {
           return false;
         }
         if (this.visibleTypes[variant.type] === false) {

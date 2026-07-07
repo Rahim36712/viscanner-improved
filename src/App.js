@@ -27,7 +27,8 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
 const DEFAULT_SV_MODE = "matched";
 const DEFAULT_SHOW_HP_SV_TRACK = false;
 const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = true;
-const HP2_SV_TRACK_HEIGHT = 145;
+const HP2_SV_TRACK_HEIGHT = 120;
+const DEFAULT_MAX_SV_SPAN = 50000;
 
 function updateWakhanTrackVisibility(visibility) {
   const hgc = window.hgc && window.hgc.current;
@@ -167,15 +168,30 @@ function SvVisibilityControls() {
   const [showSvLinesInCopyNumber, setShowSvLinesInCopyNumber] = React.useState(
     DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER
   );
+  const [maxSvSpan, setMaxSvSpan] = React.useState(DEFAULT_MAX_SV_SPAN);
+
+  const handleMaxSvSpanChange = (e) => {
+    const value = e.target.value;
+    if (value === "") {
+      setMaxSvSpan("");
+      return;
+    }
+    const parsed = parseInt(value, 10);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMaxSvSpan(parsed);
+    }
+  };
 
   React.useEffect(() => {
-    updateSvTrackVisibility({ visibleTypes: visibility, svMode });
+    const maxLen = maxSvSpan === "" || maxSvSpan === 0 ? null : maxSvSpan;
+    updateSvTrackVisibility({ visibleTypes: visibility, svMode, maxVariantLength: maxLen });
     updateCoverageSvVisibility({
       visibleTypes: visibility,
       svMode,
       showSvBreakpoints: showSvLinesInCopyNumber,
+      maxVariantLength: maxLen,
     });
-  }, [visibility, svMode, showSvLinesInCopyNumber]);
+  }, [visibility, svMode, showSvLinesInCopyNumber, maxSvSpan]);
 
   React.useEffect(() => {
     updateHpSvTrackVisibility(showHpSvTrack);
@@ -247,6 +263,22 @@ function SvVisibilityControls() {
           <span>{option.label}</span>
         </label>
       ))}
+      </div>
+      <div className="sv-control-section">
+        <div className="sv-control-section-title">SV max span</div>
+        <div className="sv-max-span-input">
+          <input
+            type="number"
+            className="form-control form-control-sm"
+            value={maxSvSpan}
+            onChange={handleMaxSvSpanChange}
+            min="0"
+            step="10000"
+            placeholder="e.g. 50000"
+          />
+          <span className="sv-max-span-unit">bp</span>
+        </div>
+        <div className="sv-max-span-hint">0 or empty = no limit</div>
       </div>
     </div>
   );

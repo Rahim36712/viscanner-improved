@@ -236,6 +236,7 @@ function WakhanCoverageTrack(HGC, ...args) {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
       };
+      this.maxVariantLength = this.options.maxVariantLength || null;
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
       this.coverageMax = this.options.coverageMax || 180;
@@ -324,6 +325,9 @@ function WakhanCoverageTrack(HGC, ...args) {
           ...this.visibleSvTypes,
           ...options.visibleTypes,
         };
+      }
+      if (options.maxVariantLength !== undefined) {
+        this.maxVariantLength = options.maxVariantLength || null;
       }
       this.resetCache();
       this.updateExistingGraphics();
@@ -452,8 +456,8 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     metrics() {
-      const top = 8;
-      const bottom = 14;
+      const top = 4;
+      const bottom = 6;
       const leftAxisX = 72;
       const rightAxisX = this.dimensions[0] - 78;
       const height = Math.max(1, this.dimensions[1] - top - bottom);
@@ -628,10 +632,17 @@ function WakhanCoverageTrack(HGC, ...args) {
         (row) => row.endAbs >= fromX && row.startAbs <= toX
       );
       const minLength = this.options.minVariantLength === undefined ? 50 : this.options.minVariantLength;
+      const maxLength = this.maxVariantLength;
       this.currentSvMarkers = [];
       if (this.showSvBreakpoints) {
         this.svVariants.forEach((variant) => {
           if (variantLength(variant) < minLength) {
+            return;
+          }
+          if (maxLength && variant.chr === variant.chr2 && variantLength(variant) > maxLength) {
+            return;
+          }
+          if (maxLength && variant.chr2 && variant.chr !== variant.chr2) {
             return;
           }
           if (this.visibleSvTypes[variant.type] === false) {
@@ -668,7 +679,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       if (!this.showSvBreakpoints || !this.currentSvMarkers.length) {
         return;
       }
-      const { top, leftAxisX, rightAxisX, height } = this.metrics();
+      const { top, leftAxisX, rightAxisX, height, centerY } = this.metrics();
       const markers = sampleRows(
         this.currentSvMarkers,
         this.options.maxSvBreakpointMarkers || 1600
@@ -683,13 +694,27 @@ function WakhanCoverageTrack(HGC, ...args) {
           SV_TYPE_COLORS[marker.variant.type] || SV_TYPE_COLORS.BND
         );
         this.svGraphics.lineStyle(1, color, SV_MARKER_ALPHA);
-        this.svGraphics.moveTo(x, top);
-        this.svGraphics.lineTo(x, top + height);
+
+        const hp = marker.variant.hp;
+        let lineTop, lineBottom;
+        if (hp === "1") {
+          lineTop = top;
+          lineBottom = centerY;
+        } else if (hp === "2") {
+          lineTop = centerY;
+          lineBottom = top + height;
+        } else {
+          lineTop = top;
+          lineBottom = top + height;
+        }
+
+        this.svGraphics.moveTo(x, lineTop);
+        this.svGraphics.lineTo(x, lineBottom);
         this.svHitRegions.push({
           marker,
           x,
-          top,
-          bottom: top + height,
+          top: lineTop,
+          bottom: lineBottom,
         });
       });
     }

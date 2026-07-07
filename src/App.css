@@ -137,6 +137,28 @@
   word-break: break-word;
 }
 
+.sv-max-span-input {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sv-max-span-input input {
+  max-width: 120px;
+}
+
+.sv-max-span-unit {
+  color: #5c646b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sv-max-span-hint {
+  color: #8a9199;
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
