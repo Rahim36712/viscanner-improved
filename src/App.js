@@ -26,6 +26,8 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
 }, {});
 const DEFAULT_SV_MODE = "matched";
 const DEFAULT_SHOW_HP_SV_TRACK = false;
+const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = true;
+const HP2_SV_TRACK_HEIGHT = 145;
 
 function updateWakhanTrackVisibility(visibility) {
   const hgc = window.hgc && window.hgc.current;
@@ -61,6 +63,22 @@ function updateSvTrackVisibility(options) {
   }
 }
 
+function updateCoverageSvVisibility(options) {
+  const hgc = window.hgc && window.hgc.current;
+  if (!hgc || !hgc.api) {
+    return;
+  }
+
+  try {
+    const wakhanTrack = hgc.api.getTrackObject("aa", "wakhan-coverage-track");
+    if (wakhanTrack && wakhanTrack.setVisibilityOptions) {
+      wakhanTrack.setVisibilityOptions(options);
+    }
+  } catch (error) {
+    return;
+  }
+}
+
 function updateHpSvTrackVisibility(showTrack) {
   const hgc = window.hgc && window.hgc.current;
   if (!hgc || !hgc.api) {
@@ -71,8 +89,20 @@ function updateHpSvTrackVisibility(showTrack) {
     const viewConfig = hgc.api.getViewConfig();
     const topTracks = viewConfig.views[0].tracks.top;
     const hpSvTrackConfig = topTracks.find((track) => track.uid === "wakhan-hp-sv-track");
+    const coverageTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-coverage-track");
+    const hpSvTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-hp-sv-track");
+    if (
+      showTrack &&
+      coverageTrackIndex >= 0 &&
+      hpSvTrackIndex >= 0 &&
+      hpSvTrackIndex < coverageTrackIndex
+    ) {
+      const [hpSvTrack] = topTracks.splice(hpSvTrackIndex, 1);
+      const updatedCoverageTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-coverage-track");
+      topTracks.splice(updatedCoverageTrackIndex + 1, 0, hpSvTrack);
+    }
     if (hpSvTrackConfig) {
-      hpSvTrackConfig.height = showTrack ? 160 : 1;
+      hpSvTrackConfig.height = showTrack ? HP2_SV_TRACK_HEIGHT : 1;
       hpSvTrackConfig.options.showTrack = showTrack;
       hgc.api.setViewConfig(viewConfig);
     }
@@ -134,10 +164,18 @@ function SvVisibilityControls() {
   const [visibility, setVisibility] = React.useState(DEFAULT_SV_VISIBILITY);
   const [svMode, setSvMode] = React.useState(DEFAULT_SV_MODE);
   const [showHpSvTrack, setShowHpSvTrack] = React.useState(DEFAULT_SHOW_HP_SV_TRACK);
+  const [showSvLinesInCopyNumber, setShowSvLinesInCopyNumber] = React.useState(
+    DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER
+  );
 
   React.useEffect(() => {
     updateSvTrackVisibility({ visibleTypes: visibility, svMode });
-  }, [visibility, svMode]);
+    updateCoverageSvVisibility({
+      visibleTypes: visibility,
+      svMode,
+      showSvBreakpoints: showSvLinesInCopyNumber,
+    });
+  }, [visibility, svMode, showSvLinesInCopyNumber]);
 
   React.useEffect(() => {
     updateHpSvTrackVisibility(showHpSvTrack);
@@ -153,15 +191,8 @@ function SvVisibilityControls() {
   return (
     <div className="wakhan-visibility border p-2 mt-3">
       <div className="wakhan-visibility-title">SV visibility</div>
-      <label className="wakhan-visibility-option">
-        <input
-          type="checkbox"
-          checked={showHpSvTrack}
-          onChange={() => setShowHpSvTrack((current) => !current)}
-        />
-        <span>HP1/HP2 SV plot</span>
-      </label>
-      <div className="sv-filter-mode">
+      <div className="sv-control-section">
+        <div className="sv-control-section-title">SV source</div>
         <label className="wakhan-visibility-option">
           <input
             type="radio"
@@ -181,6 +212,27 @@ function SvVisibilityControls() {
           <span>All VCF SVs</span>
         </label>
       </div>
+      <div className="sv-control-section">
+        <div className="sv-control-section-title">SV displays</div>
+        <label className="wakhan-visibility-option">
+          <input
+            type="checkbox"
+            checked={showHpSvTrack}
+            onChange={() => setShowHpSvTrack((current) => !current)}
+          />
+          <span>HP2 SV plot</span>
+        </label>
+        <label className="wakhan-visibility-option">
+          <input
+            type="checkbox"
+            checked={showSvLinesInCopyNumber}
+            onChange={() => setShowSvLinesInCopyNumber((current) => !current)}
+          />
+          <span>SV lines in copy-number plot</span>
+        </label>
+      </div>
+      <div className="sv-control-section">
+        <div className="sv-control-section-title">SV types</div>
       {SV_TYPE_OPTIONS.map((option) => (
         <label className="wakhan-visibility-option sv-visibility-option" key={option.key}>
           <input
@@ -195,6 +247,7 @@ function SvVisibilityControls() {
           <span>{option.label}</span>
         </label>
       ))}
+      </div>
     </div>
   );
 }

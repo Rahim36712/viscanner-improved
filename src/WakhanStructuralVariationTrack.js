@@ -26,6 +26,10 @@ const DEFAULT_VISIBLE_TYPES = {
 };
 const DEFAULT_SV_MODE = "matched";
 
+function normalizeHpFilter(value) {
+  return value === "1" || value === "2" ? value : null;
+}
+
 function normalizeTrackData(data) {
   if (Array.isArray(data)) {
     return { variants: data, matchedIds: [] };
@@ -79,6 +83,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
       this.showTrack = this.options.showTrack !== false;
       this.hpLaneMode = this.options.hpLaneMode === true;
+      this.hpFilter = normalizeHpFilter(this.options.hpFilter);
       this.visibleTypes = {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
@@ -147,6 +152,9 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       if (options.showTrack !== undefined) {
         this.showTrack = options.showTrack !== false;
       }
+      if (options.hpFilter !== undefined) {
+        this.hpFilter = normalizeHpFilter(options.hpFilter);
+      }
       this.resetCache();
       this.updateExistingGraphics();
       this.animate();
@@ -192,6 +200,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.svMode = this.svMode || this.options.svMode || DEFAULT_SV_MODE;
       this.showTrack = this.showTrack === undefined ? this.options.showTrack !== false : this.showTrack;
       this.hpLaneMode = this.options.hpLaneMode === true;
+      this.hpFilter =
+        this.hpFilter === undefined ? normalizeHpFilter(this.options.hpFilter) : this.hpFilter;
       this.visibleTypes = {
         ...DEFAULT_VISIBLE_TYPES,
         ...this.visibleTypes,
@@ -204,12 +214,14 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     metrics() {
-      const top = this.hpLaneMode ? 12 : 28;
-      const bottom = this.hpLaneMode ? 12 : 12;
+      const top = this.hpLaneMode ? 8 : 14;
+      const bottom = this.hpLaneMode ? 8 : 8;
       const leftAxisX = 72;
       const rightAxisX = this.dimensions[0] - 78;
       const height = Math.max(1, this.dimensions[1] - top - bottom);
-      const baselineY = top + height - 10;
+      const baselineY = this.hpFilter === "2" && !this.hpLaneMode
+        ? top + 10
+        : top + height - 10;
       const centerY = top + height / 2;
       return { top, bottom, leftAxisX, rightAxisX, height, baselineY, centerY };
     }
@@ -285,21 +297,30 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.axisGraphics.moveTo(rightAxisX, top);
       this.axisGraphics.lineTo(rightAxisX, top + height);
 
-      this.addText(this.hpLaneMode ? "HP SVs" : "Breakpoints", 20, top + height / 2, {
+      const axisLabel = this.hpFilter
+        ? `HP-${this.hpFilter} breakpoints`
+        : this.hpLaneMode
+          ? "HP SVs"
+          : "Breakpoints";
+      this.addText(axisLabel, 20, top + height / 2, {
         rotation: -Math.PI / 2,
         fontSize: "12px",
       });
       if (this.hpLaneMode) {
-        this.addText("HP-1", rightAxisX + 10, top + 15, {
-          anchorX: 0,
-          fill: TYPE_COLORS.DEL,
-          fontSize: "12px",
-        });
-        this.addText("HP-2", rightAxisX + 10, top + height - 15, {
-          anchorX: 0,
-          fill: "#2D7DD2",
-          fontSize: "12px",
-        });
+        if (!this.hpFilter || this.hpFilter === "1") {
+          this.addText("HP-1", rightAxisX + 10, top + 15, {
+            anchorX: 0,
+            fill: TYPE_COLORS.DEL,
+            fontSize: "12px",
+          });
+        }
+        if (!this.hpFilter || this.hpFilter === "2") {
+          this.addText("HP-2", rightAxisX + 10, top + height - 15, {
+            anchorX: 0,
+            fill: "#2D7DD2",
+            fontSize: "12px",
+          });
+        }
       }
     }
 
@@ -319,6 +340,9 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       const passOnly = this.options.passOnly !== false;
       const endpointPadding = Math.max(5000, Math.abs(toX - fromX) * 0.2);
       this.currentVariants = this.variants.filter((variant) => {
+        if (this.hpFilter && variant.hp !== this.hpFilter) {
+          return false;
+        }
         if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
           return false;
         }
@@ -375,7 +399,11 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         }
       } else {
         const arcLift = 28 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 38);
-        apexY = Math.max(top + 8, baselineY - Math.min(height - 18, arcLift));
+        if (this.hpFilter === "2") {
+          apexY = Math.min(top + height - 8, baselineY + Math.min(height - 18, arcLift));
+        } else {
+          apexY = Math.max(top + 8, baselineY - Math.min(height - 18, arcLift));
+        }
       }
       const controlX = (x1 + x2) / 2;
       const steps = span > 280 ? 30 : 22;
@@ -409,6 +437,10 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       const x = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
       let markerTop = top + 8;
       let markerBottom = baselineY;
+      if (this.hpFilter === "2" && !this.hpLaneMode) {
+        markerTop = baselineY;
+        markerBottom = top + height - 8;
+      }
       if (this.hpLaneMode) {
         if (variant.hp === "1") {
           markerTop = top + 7;
@@ -556,6 +588,7 @@ WakhanStructuralVariationTrack.config = {
     "minVariantLength",
     "passOnly",
     "hpLaneMode",
+    "hpFilter",
     "showTrack",
     "svMode",
     "visibleTypes",
@@ -566,6 +599,7 @@ WakhanStructuralVariationTrack.config = {
     minVariantLength: 50,
     passOnly: true,
     hpLaneMode: false,
+    hpFilter: null,
     showTrack: true,
     svMode: DEFAULT_SV_MODE,
     visibleTypes: DEFAULT_VISIBLE_TYPES,

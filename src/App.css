@@ -102,10 +102,25 @@
   gap: 0.45rem;
 }
 
-.sv-filter-mode {
+.sv-control-section {
   border-bottom: 1px solid #e1e5e8;
   margin-bottom: 0.55rem;
   padding-bottom: 0.35rem;
+}
+
+.sv-control-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.sv-control-section-title {
+  color: #5c646b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
 }
 
 .sv-color-swatch {

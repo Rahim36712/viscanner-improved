@@ -3,7 +3,7 @@
     "editable": true,
     "zoomFixed": false,
     "trackSourceServers": [
-      "//higlass.io/api/v1"
+      "https://higlass.io/api/v1"
     ],
     "exportViewUrl": "/api/v1/viewconfs",
     "views": [
@@ -13,11 +13,11 @@
           250000000,
           350000000
         ],
-        "autocompleteSource": "/api/v1/suggest/?d=OHJakQICQD6gTD7skx4EWA&",
+        "autocompleteSource": "https://higlass.io/api/v1/suggest/?d=OHJakQICQD6gTD7skx4EWA&",
         "genomePositionSearchBox": {
-          "autocompleteServer": "//higlass.io/api/v1",
+          "autocompleteServer": "https://higlass.io/api/v1",
           "autocompleteId": "OHJakQICQD6gTD7skx4EWA",
-          "chromInfoServer": "//higlass.io/api/v1",
+          "chromInfoServer": "https://higlass.io/api/v1",
           "chromInfoId": "hg19",
           "visible": true
         },
@@ -28,7 +28,7 @@
               "type": "horizontal-gene-annotations",
               "height": 60,
               "tilesetUid": "OHJakQICQD6gTD7skx4EWA",
-              "server": "//higlass.io/api/v1",
+              "server": "https://higlass.io/api/v1",
               "uid": "OHJakQICQD6gTD7skx4EWA",
               "options": {
                 "name": "Gene Annotations (hg19)",
@@ -94,6 +94,7 @@
                 "maxVisibleVariants": 1200,
                 "minVariantLength": 50,
                 "passOnly": true,
+                "hpFilter": "1",
                 "svMode": "matched",
                 "visibleTypes": {
                   "DEL": true,
@@ -118,11 +119,27 @@
               "options": {
                 "coverageMax": 180,
                 "maxCoveragePoints": 6000,
+                "maxSvBreakpointMarkers": 1600,
+                "minVariantLength": 50,
                 "showHp1": true,
                 "showHp2": true,
                 "showCoverage": true,
+                "showSvBreakpoints": true,
+                "svMode": "matched",
+                "visibleTypes": {
+                  "DEL": true,
+                  "INV": true,
+                  "INS": true,
+                  "BND": true,
+                  "DUP": true,
+                  "sBND": true
+                },
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
-                "data": {}
+                "data": {},
+                "svData": {
+                  "variants": [],
+                  "matchedIds": []
+                }
               },
               "height": 310,
               "uid": "wakhan-coverage-track",
@@ -134,7 +151,8 @@
                 "maxVisibleVariants": 1200,
                 "minVariantLength": 50,
                 "passOnly": true,
-                "hpLaneMode": true,
+                "hpLaneMode": false,
+                "hpFilter": "2",
                 "showTrack": false,
                 "svMode": "matched",
                 "visibleTypes": {

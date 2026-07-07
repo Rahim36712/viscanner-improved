@@ -201,6 +201,46 @@ BED copy number
 Confidence
 ```
 
+### SV Breakpoint Lines Inside The Coverage/CN Plot
+
+The HP1/HP2 coverage plot now also supports a lightweight vertical SV breakpoint overlay.
+
+Implementation:
+
+```text
+src/WakhanCoverageTrack.js
+```
+
+Behavior:
+
+- The overlay uses the same parsed Severus VCF data as the structural-variation tracks.
+- It draws only vertical breakpoint endpoint lines inside the HP1/HP2 coverage/copy-number plot.
+- It does not draw arcs in the coverage plot.
+- A paired or interval-like SV can contribute two vertical endpoint lines: one at `From`, one at `To`.
+- `INS` and `sBND` usually contribute one vertical endpoint line.
+- Colors follow the same SV type color map as the SV plot.
+- Hovering a vertical line shows SV ID, type, endpoint, position, length, HP, VAF, and DV.
+
+Sidebar control:
+
+```text
+SV visibility -> SV lines in copy-number plot
+```
+
+This checkbox enables/disables the vertical SV lines inside the coverage/CN plot.
+
+The coverage/CN SV lines also respect:
+
+```text
+BED-matched SVs / All VCF SVs
+DEL / INV / INS / BND / DUP / sBND type checkboxes
+```
+
+Performance behavior:
+
+- The overlay only draws endpoint lines that are inside the current visible genomic window.
+- It samples markers using `maxSvBreakpointMarkers` to avoid slowing the plot when many breakpoints are visible.
+
 ## Structural Variation Parsing
 
 Severus structural variants are parsed from:
@@ -272,7 +312,9 @@ Location:
 
 Behavior:
 
-- Shows a WAKHAN-like breakpoint/SV plot.
+- Shows a WAKHAN-like breakpoint/SV plot for HP1 only.
+- Uses `INFO/HP=1` from the Severus VCF.
+- Variants with `INFO/HP=2` or missing HP are not shown in this top SV plot.
 - Uses pastel colors:
 
 ```text
@@ -299,7 +341,7 @@ INS
 BND
 DUP
 sBND
-HP1/HP2 SV plot
+HP2 SV plot
 ```
 
 Default mode:
@@ -329,7 +371,7 @@ Fix:
 
 This prevents giant crossing arcs from stealing hover/tooltip focus in unrelated inspected regions.
 
-## HP1/HP2 Structural Variation Plot
+## HP2 Structural Variation Plot
 
 A second instance of the same SV track was added below the HP1/HP2 coverage plot.
 
@@ -344,27 +386,28 @@ It is hidden by default.
 Sidebar checkbox:
 
 ```text
-HP1/HP2 SV plot
+HP2 SV plot
 ```
 
 When enabled:
 
 - A new plot appears under the HP1/HP2 coverage plot.
-- HP1 SVs are drawn in the upper lane.
-- HP2 SVs are drawn in the lower lane.
-- Missing/unassigned HP variants are hidden from this HP-specific plot.
+- Only HP2 SVs are drawn.
+- The HP2 plot is flipped: its baseline is at the top and arcs/markers extend downward.
+- The earlier double-lane HP1/HP2 layout was removed because the double axis looked crowded.
+- Missing/unassigned HP variants are hidden from this HP2-specific plot.
 
 Rules:
 
 ```text
-INFO/HP=1 -> HP1 lane
-INFO/HP=2 -> HP2 lane
-missing HP -> hidden from HP-specific plot
+INFO/HP=1 -> top SV plot above coverage
+INFO/HP=2 -> optional HP2 SV plot below coverage
+missing HP -> hidden from HP-specific plots
 ```
 
-The missing HP variants remain visible in the general SV plot above coverage.
+The missing HP variants remain hidden from these separated HP-specific SV plots.
 
-The same SV type checkboxes also affect this HP-specific plot.
+The same SV type checkboxes also affect the HP2-specific plot.
 
 ## Sidebar Controls
 
@@ -383,7 +426,7 @@ Controls the HP1/HP2 coverage track.
 ### SV visibility
 
 ```text
-HP1/HP2 SV plot
+HP2 SV plot
 BED-matched SVs
 All VCF SVs
 DEL
@@ -481,7 +524,7 @@ Key responsibilities:
 - BED-matched vs all VCF filtering.
 - Endpoint-aware viewport filtering.
 - Nearest-hover behavior.
-- HP lane mode for HP1/HP2 SV plot.
+- Haplotype filtering for separated HP1 and HP2 SV plots.
 
 ### `src/Uploader.js`
 
@@ -504,7 +547,7 @@ Sidebar controls:
 
 - WAKHAN visibility.
 - SV visibility.
-- HP1/HP2 SV plot show/hide.
+- HP2 SV plot show/hide.
 
 ### `src/CnvTable.js`
 
@@ -622,9 +665,10 @@ After running the app and uploading `files-valid.zip`:
 7. Coverage hover should show raw coverage and copy-number equivalent.
 8. `BED-matched SVs` should show fewer SVs than `All VCF SVs`.
 9. Inspecting the `BND252` region should not incorrectly show `BND163` just because its long arc crosses the window.
-10. Checking `HP1/HP2 SV plot` should reveal a new track under the coverage plot.
-11. HP-specific SV plot should show only `HP=1` and `HP=2` variants.
-12. Missing HP variants should not appear in the HP-specific SV plot.
+10. The top SV plot should show only `INFO/HP=1` variants.
+11. Checking `HP2 SV plot` should reveal a new track under the coverage plot.
+12. The lower HP2 SV plot should show only `INFO/HP=2` variants.
+13. Missing HP variants should not appear in the HP-specific SV plots.
 
 ## Data Facts From Current Test Files
 
