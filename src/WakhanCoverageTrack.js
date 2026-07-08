@@ -549,14 +549,14 @@ function WakhanCoverageTrack(HGC, ...args) {
         fontSize: "12px",
       });
       if (this.showHp1) {
-        this.addText("HP-1", rightAxisX + 10, top + 12, {
+        this.addText("HP-1", rightAxisX + 26, top + 12, {
           anchorX: 0,
           fill: HP1_COLOR,
           fontSize: "12px",
         });
       }
       if (this.showHp2) {
-        this.addText("HP-2", rightAxisX + 10, bottomY - 12, {
+        this.addText("HP-2", rightAxisX + 26, bottomY - 12, {
           anchorX: 0,
           fill: HP2_COLOR,
           fontSize: "12px",
