@@ -10,8 +10,8 @@
       {
         "uid": "aa",
         "initialXDomain": [
-          250000000,
-          350000000
+          0,
+          3095693983
         ],
         "autocompleteSource": "https://higlass.io/api/v1/suggest/?d=OHJakQICQD6gTD7skx4EWA&",
         "genomePositionSearchBox": {
@@ -93,7 +93,7 @@
               "options": {
                 "maxVisibleVariants": 1200,
                 "minVariantLength": 50,
-                "maxVariantLength": 50000,
+                "maxVariantLength": null,
                 "passOnly": true,
                 "hpFilter": "1",
                 "svMode": "matched",
@@ -122,7 +122,7 @@
                 "maxCoveragePoints": 6000,
                 "maxSvBreakpointMarkers": 1600,
                 "minVariantLength": 50,
-                "maxVariantLength": 50000,
+                "maxVariantLength": null,
                 "showHp1": true,
                 "showHp2": true,
                 "showCoverage": true,
@@ -152,11 +152,14 @@
               "options": {
                 "maxVisibleVariants": 1200,
                 "minVariantLength": 50,
-                "maxVariantLength": 50000,
+                "maxVariantLength": null,
                 "passOnly": true,
                 "hpLaneMode": false,
                 "hpFilter": "2",
-                "showTrack": false,
+                "showTrack": true,
+                "layoutAfterUid": "wakhan-coverage-track",
+                "layoutHeight": 120,
+                "collapsedHeight": 1,
                 "svMode": "matched",
                 "visibleTypes": {
                   "DEL": true,
@@ -172,7 +175,7 @@
                   "matchedIds": []
                 }
               },
-              "height": 1,
+              "height": 120,
               "uid": "wakhan-hp-sv-track",
               "width": 450
             }

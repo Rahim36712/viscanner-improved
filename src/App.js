@@ -4,6 +4,7 @@ import { Facets } from "./Facets";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
+import { fitToContent, scheduleFitToContent } from "./higlassLayout";
 
 const DEFAULT_WAKHAN_VISIBILITY = {
   showHp1: true,
@@ -25,10 +26,9 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
   return visibility;
 }, {});
 const DEFAULT_SV_MODE = "matched";
-const DEFAULT_SHOW_HP_SV_TRACK = false;
+const DEFAULT_SHOW_HP_SV_TRACK = true;
 const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = true;
-const HP2_SV_TRACK_HEIGHT = 120;
-const DEFAULT_MAX_SV_SPAN = 50000;
+const DEFAULT_MAX_SV_SPAN = 0;
 
 function updateWakhanTrackVisibility(visibility) {
   const hgc = window.hgc && window.hgc.current;
@@ -41,6 +41,7 @@ function updateWakhanTrackVisibility(visibility) {
     if (wakhanTrack && wakhanTrack.setVisibilityOptions) {
       wakhanTrack.setVisibilityOptions(visibility);
     }
+    scheduleFitToContent();
   } catch (error) {
     return;
   }
@@ -59,6 +60,7 @@ function updateSvTrackVisibility(options) {
         svTrack.setVisibilityOptions(options);
       }
     });
+    scheduleFitToContent();
   } catch (error) {
     return;
   }
@@ -75,6 +77,7 @@ function updateCoverageSvVisibility(options) {
     if (wakhanTrack && wakhanTrack.setVisibilityOptions) {
       wakhanTrack.setVisibilityOptions(options);
     }
+    scheduleFitToContent();
   } catch (error) {
     return;
   }
@@ -87,31 +90,21 @@ function updateHpSvTrackVisibility(showTrack) {
   }
 
   try {
-    const viewConfig = hgc.api.getViewConfig();
-    const topTracks = viewConfig.views[0].tracks.top;
-    const hpSvTrackConfig = topTracks.find((track) => track.uid === "wakhan-hp-sv-track");
-    const coverageTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-coverage-track");
-    const hpSvTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-hp-sv-track");
-    if (
-      showTrack &&
-      coverageTrackIndex >= 0 &&
-      hpSvTrackIndex >= 0 &&
-      hpSvTrackIndex < coverageTrackIndex
-    ) {
-      const [hpSvTrack] = topTracks.splice(hpSvTrackIndex, 1);
-      const updatedCoverageTrackIndex = topTracks.findIndex((track) => track.uid === "wakhan-coverage-track");
-      topTracks.splice(updatedCoverageTrackIndex + 1, 0, hpSvTrack);
-    }
-    if (hpSvTrackConfig) {
-      hpSvTrackConfig.height = showTrack ? HP2_SV_TRACK_HEIGHT : 1;
-      hpSvTrackConfig.options.showTrack = showTrack;
-      hgc.api.setViewConfig(viewConfig);
-    }
-    const hpSvTrack = hgc.api.getTrackObject("aa", "wakhan-hp-sv-track");
-    if (hpSvTrack && hpSvTrack.setVisibilityOptions) {
-      hpSvTrack.setVisibilityOptions({ showTrack });
-    }
+    fitToContent({
+      resetLocation: showTrack,
+      preserveLocation: !showTrack,
+      trackOptionsByUid: {
+        "wakhan-hp-sv-track": { showTrack },
+      },
+    }).then(() => {
+      const hpSvTrack = hgc.api.getTrackObject("aa", "wakhan-hp-sv-track");
+      if (hpSvTrack && hpSvTrack.setVisibilityOptions) {
+        hpSvTrack.setVisibilityOptions({ showTrack });
+      }
+      scheduleFitToContent();
+    });
   } catch (error) {
+    console.error("Error in updateHpSvTrackVisibility:", error);
     return;
   }
 }
@@ -318,7 +311,7 @@ function App() {
             <SvVisibilityControls />
           </div>
           <div className="col-md-9">
-            <div className="fixedHeight">
+            <div className="fixedHeight" id="higlass-container">
               <HiglassBrowser />
             </div>
           </div>

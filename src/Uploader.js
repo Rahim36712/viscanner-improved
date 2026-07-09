@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
+import { scheduleFitToContent } from "./higlassLayout";
 
 async function decompressBlob(blob) {
   let ds = new DecompressionStream("gzip");
@@ -533,6 +534,8 @@ function parseUploadedEntryTexts(entryTexts, props) {
   } else if (entryTexts["baf.csv"]) {
     updateBafSnpTrack(parseSnpData(entryTexts["baf.csv"], ","));
   }
+
+  scheduleFitToContent({ resetLocation: true, preserveLocation: false, delay: 250 });
 }
 
 async function readZip(file, props) {

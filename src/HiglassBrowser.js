@@ -10,6 +10,7 @@ import { default as TextTrack } from "higlass-text/es/TextTrack";
 import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
 import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
 import { default as WakhanStructuralVariationTrack } from "./WakhanStructuralVariationTrack";
+import { scheduleFitToContent } from "./higlassLayout";
 // import { default as OrthologsTrack } from "higlass-orthologs/es/OrthologsTrack";
 // import { default as GnomadTrack } from "higlass-gnomad/es/GnomadTrack";
 // import { default as GeneralVcfTrack } from 'higlass-general-vcf/es/GeneralVcfTrack';
@@ -93,7 +94,19 @@ export class HiglassBrowser extends React.PureComponent {
     // );
   }
 
-  componentDidMount() {}
+  componentDidMount() {
+    this.handleWindowResize = () => {
+      if (!window.__viscannerApplyingLayout) {
+        scheduleFitToContent();
+      }
+    };
+    window.addEventListener("resize", this.handleWindowResize);
+    scheduleFitToContent({ delay: 0 });
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("resize", this.handleWindowResize);
+  }
 
   render() {
     return (

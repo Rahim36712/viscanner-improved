@@ -179,6 +179,13 @@ function ScannerResultTrackPatched(HGC, ...args) {
   instance.updateExistingGraphics = patchedUpdateExistingGraphics.bind(instance);
   applyScaleConfig();
 
+  const originalCreateLegendGraphics = instance.createLegendGraphics.bind(instance);
+  instance.createLegendGraphics = function patchedCreateLegendGraphics(maxValue) {
+    this.legendHeight = this.dimensions[1] - 1;
+    this.legendVerticalOffset = 1;
+    return originalCreateLegendGraphics(maxValue);
+  };
+
   return instance;
 }
 

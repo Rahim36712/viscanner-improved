@@ -4,6 +4,7 @@ import React from "react";
 
 import { GeneSearchBox } from "./GeneSearchBox";
 import { ChromosomeInfo } from "higlass/dist/hglib";
+import { resetHiglassView, scheduleFitToContent } from "./higlassLayout";
 // import Select from "react-select";
 
 // import viewConfigClinvar from "./viewConfig.clinvar.json";
@@ -112,6 +113,7 @@ export class Facets extends React.PureComponent {
           chromInfo.chrToAbs(['chr1', 1000]),
           2500  // Animation time
         );
+        scheduleFitToContent();
       });
   };
 
@@ -148,6 +150,13 @@ export class Facets extends React.PureComponent {
 
             <div className="mb-1 mt-2">Go to specific gene</div>
             <GeneSearchBox />
+            <button
+              className="btn btn-outline-secondary btn-sm btn-block mt-2 mb-3"
+              onClick={resetHiglassView}
+              type="button"
+            >
+              Reset View
+            </button>
             {/* <div className="form-check mt-3">
               <input
                 type="checkbox"

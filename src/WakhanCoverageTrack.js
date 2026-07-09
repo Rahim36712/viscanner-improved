@@ -456,13 +456,13 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     metrics() {
-      const top = 4;
-      const bottom = 6;
+      const top = 0;
+      const bottom = 0;
       const leftAxisX = 72;
       const rightAxisX = this.dimensions[0] - 78;
       const height = Math.max(1, this.dimensions[1] - top - bottom);
       const centerY = top + height / 2;
-      const halfHeight = height / 2 - 8;
+      const halfHeight = height / 2 - 1;
       return { top, bottom, leftAxisX, rightAxisX, height, centerY, halfHeight };
     }
 

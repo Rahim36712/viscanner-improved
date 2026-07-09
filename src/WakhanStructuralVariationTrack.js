@@ -218,14 +218,14 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     metrics() {
-      const top = this.hpLaneMode ? 8 : 14;
-      const bottom = this.hpLaneMode ? 8 : 8;
+      const top = this.hpLaneMode ? 4 : 0;
+      const bottom = this.hpLaneMode ? 4 : 0;
       const leftAxisX = 72;
       const rightAxisX = this.dimensions[0] - 78;
       const height = Math.max(1, this.dimensions[1] - top - bottom);
       const baselineY = this.hpFilter === "2" && !this.hpLaneMode
-        ? top + 10
-        : top + height - 10;
+        ? top + 2
+        : top + height - 2;
       const centerY = top + height / 2;
       return { top, bottom, leftAxisX, rightAxisX, height, baselineY, centerY };
     }
@@ -397,23 +397,23 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       let endY = baselineY;
       let apexY;
       if (this.hpLaneMode) {
-        const laneHeight = Math.max(18, height / 2 - 12);
-        const laneLift = 12 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 10);
+        const laneHeight = Math.max(18, height / 2 - 6);
+        const laneLift = 8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6);
         if (variant.hp === "1") {
           startY = centerY - 4;
           endY = centerY - 4;
-          apexY = Math.max(top + 7, startY - laneLift);
+          apexY = Math.max(top + 2, startY - laneLift);
         } else {
           startY = centerY + 4;
           endY = centerY + 4;
-          apexY = Math.min(top + height - 7, startY + laneLift);
+          apexY = Math.min(top + height - 2, startY + laneLift);
         }
       } else {
-        const arcLift = 28 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 38);
+        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
         if (this.hpFilter === "2") {
-          apexY = Math.min(top + height - 8, baselineY + Math.min(height - 18, arcLift));
+          apexY = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
         } else {
-          apexY = Math.max(top + 8, baselineY - Math.min(height - 18, arcLift));
+          apexY = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
         }
       }
       const controlX = (x1 + x2) / 2;
@@ -446,19 +446,19 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     drawMarker(variant, color) {
       const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
       const x = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
-      let markerTop = top + 8;
+      let markerTop = top + 2;
       let markerBottom = baselineY;
       if (this.hpFilter === "2" && !this.hpLaneMode) {
         markerTop = baselineY;
-        markerBottom = top + height - 8;
+        markerBottom = top + height - 2;
       }
       if (this.hpLaneMode) {
         if (variant.hp === "1") {
-          markerTop = top + 7;
+          markerTop = top + 2;
           markerBottom = centerY - 4;
         } else {
           markerTop = centerY + 4;
-          markerBottom = top + height - 7;
+          markerBottom = top + height - 2;
         }
       }
       this.variantGraphics.lineStyle(1, color, MARKER_ALPHA);

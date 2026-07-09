@@ -5,6 +5,7 @@ import Uploader from "./Uploader";
 import { ChromosomeInfo } from "higlass/dist/hglib";
 import { format } from "d3-format";
 import Select from "react-select";
+import { scheduleFitToContent } from "./higlassLayout";
 
 const PAGE_SIZE = 20;
 
@@ -283,6 +284,7 @@ export class CnvTable extends React.PureComponent {
             chromInfo.chrToAbs(["chr1", 1000]),
             2500 // Animation time
           );
+          scheduleFitToContent();
         });
     }, "500");
   };
