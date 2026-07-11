@@ -101,7 +101,7 @@ export class GeneSearchBox extends React.PureComponent {
       const viewconf = hgc.api.getViewConfig();
       const viewId0 = viewconf.views[0].uid;
       hgc.api.zoomToGene(viewId0, geneName, 5000, 2000);
-      scheduleFitToContent();
+      scheduleFitToContent({ delay: 2100 });
       // const viewId1 = viewconf.views[1].uid;
       // hgc.api.zoomToGene(viewId1, geneName, 5000, 2000);
     }

@@ -74,12 +74,7 @@
 }
 
 .fixedHeight {
-  height: 700px;
   min-height: 500px;
-  max-height: 2000px;
-  resize: vertical;
-  overflow: hidden;
-  border-bottom: 2px dashed #dee2e6;
   position: relative;
 }
 

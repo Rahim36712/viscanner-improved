@@ -170,6 +170,18 @@ function ScannerResultTrackPatched(HGC, ...args) {
     this.loadingText.text = "";
   };
 
+  const originalSetData = instance.setData.bind(instance);
+  instance.setData = function patchedSetData(data) {
+    this.options.data = data;
+    return originalSetData(data);
+  };
+
+  const originalSetSnpData = instance.setSnpData.bind(instance);
+  instance.setSnpData = function patchedSetSnpData(data) {
+    this.options.snpData = data;
+    return originalSetSnpData(data);
+  };
+
   const originalRerender = instance.rerender.bind(instance);
   instance.rerender = function patchedRerender(options) {
     applyScaleConfig(options);

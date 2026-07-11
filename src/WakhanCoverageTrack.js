@@ -292,11 +292,13 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     setData(data) {
+      this.options.data = data;
       this.parseData(data);
       this.rerender(this.options);
     }
 
     setStructuralVariationData(data) {
+      this.options.svData = data;
       this.svData = data || { variants: [], matchedIds: [] };
       this.parseStructuralVariationData(this.svData);
       this.resetCache();

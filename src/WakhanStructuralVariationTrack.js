@@ -136,6 +136,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     setData(data) {
+      this.options.data = data;
       this.rawData = data || [];
       this.parseData(this.rawData);
       this.rerender(this.options);

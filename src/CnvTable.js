@@ -126,7 +126,7 @@ export class CnvTable extends React.PureComponent {
     const tableType = data && data.type === "wakhan" ? "wakhan" : "hiscanner";
     const rows = tableType === "wakhan" ? data.rows : data;
 
-    ChromosomeInfo("//s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+    ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
       // Now we can use the chromInfo object to convert
       .then((chromInfo) => {
         rows.forEach((variant) => {
@@ -273,7 +273,7 @@ export class CnvTable extends React.PureComponent {
     setTimeout(() => {
       const viewconf = hgc.api.getViewConfig();
 
-      ChromosomeInfo("//s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+      ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
         // Now we can use the chromInfo object to convert
         .then((chromInfo) => {
           hgc.api.zoomTo(
@@ -284,7 +284,7 @@ export class CnvTable extends React.PureComponent {
             chromInfo.chrToAbs(["chr1", 1000]),
             2500 // Animation time
           );
-          scheduleFitToContent();
+          scheduleFitToContent({ delay: 2600 });
         });
     }, "500");
   };

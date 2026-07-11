@@ -102,7 +102,7 @@ export class Facets extends React.PureComponent {
 
     const viewconf = hgc.api.getViewConfig();
 
-    ChromosomeInfo("//s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+    ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
       // Now we can use the chromInfo object to convert
       .then((chromInfo) => {
         hgc.api.zoomTo(
@@ -113,7 +113,7 @@ export class Facets extends React.PureComponent {
           chromInfo.chrToAbs(['chr1', 1000]),
           2500  // Animation time
         );
-        scheduleFitToContent();
+        scheduleFitToContent({ delay: 2600 });
       });
   };
 
