@@ -447,19 +447,31 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     drawMarker(variant, color) {
       const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
       const x = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
-      let markerTop = top + 2;
+      const x2 = Number.isFinite(variant.endAbs)
+        ? Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.endAbs)))
+        : x;
+      const span = Math.abs(x2 - x);
+      const plotWidth = Math.max(1, rightAxisX - leftAxisX);
+      let markerTop = baselineY;
       let markerBottom = baselineY;
       if (this.hpFilter === "2" && !this.hpLaneMode) {
         markerTop = baselineY;
-        markerBottom = top + height - 2;
+        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
+        markerBottom = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
+      } else if (!this.hpLaneMode) {
+        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
+        markerTop = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
+        markerBottom = baselineY;
       }
       if (this.hpLaneMode) {
+        const laneHeight = Math.max(18, height / 2 - 6);
+        const laneLift = 8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6);
         if (variant.hp === "1") {
-          markerTop = top + 2;
           markerBottom = centerY - 4;
+          markerTop = Math.max(top + 2, markerBottom - laneLift);
         } else {
           markerTop = centerY + 4;
-          markerBottom = top + height - 2;
+          markerBottom = Math.min(top + height - 2, markerTop + laneLift);
         }
       }
       this.variantGraphics.lineStyle(1, color, MARKER_ALPHA);
