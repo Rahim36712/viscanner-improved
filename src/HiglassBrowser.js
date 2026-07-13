@@ -7,6 +7,7 @@ import { default as higlassRegister } from "higlass-register/dist/higlass-regist
 // import { default as TranscriptsTrack } from "higlass-transcripts/es/TranscriptsTrack";
 // import { default as ClinvarTrack } from "higlass-clinvar/es/ClinvarTrack";
 import { default as TextTrack } from "higlass-text/es/TextTrack";
+import { default as AlignedChromosomeLabelsTrack } from "./AlignedChromosomeLabelsTrack";
 import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
 import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
 import { default as WakhanStructuralVariationTrack } from "./WakhanStructuralVariationTrack";
@@ -44,6 +45,11 @@ export class HiglassBrowser extends React.PureComponent {
       name: "TextTrack",
       track: TextTrack,
       config: TextTrack.config,
+    });
+    higlassRegister({
+      name: "AlignedChromosomeLabelsTrack",
+      track: AlignedChromosomeLabelsTrack,
+      config: AlignedChromosomeLabelsTrack.config,
     });
     higlassRegister({
       name: "ScannerResultTrack",

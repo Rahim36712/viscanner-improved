@@ -54,11 +54,11 @@
               "width": 843
             },
             {
-              "chromInfoPath": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
-              "type": "horizontal-chromosome-labels",
+              "type": "alignedChromosomeLabels",
               "height": 30,
               "uid": "X4e_1DKiQHmyghDa6lLMVA",
               "options": {
+                "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "color": "#808080",
                 "stroke": "#ffffff",
                 "fontSize": 12,
