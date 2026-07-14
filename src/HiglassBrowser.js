@@ -11,6 +11,7 @@ import { default as AlignedChromosomeLabelsTrack } from "./AlignedChromosomeLabe
 import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
 import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
 import { default as WakhanStructuralVariationTrack } from "./WakhanStructuralVariationTrack";
+import { default as HorizontalGeneAnnotationsTrack } from "./HorizontalGeneAnnotationsTrackPatched";
 import { scheduleFitToContent } from "./higlassLayout";
 // import { default as OrthologsTrack } from "higlass-orthologs/es/OrthologsTrack";
 // import { default as GnomadTrack } from "higlass-gnomad/es/GnomadTrack";
@@ -50,22 +51,27 @@ export class HiglassBrowser extends React.PureComponent {
       name: "AlignedChromosomeLabelsTrack",
       track: AlignedChromosomeLabelsTrack,
       config: AlignedChromosomeLabelsTrack.config,
-    });
+    }, { force: true });
     higlassRegister({
       name: "ScannerResultTrack",
       track: ScannerResultTrack,
       config: ScannerResultTrack.config,
-    });
+    }, { force: true });
     higlassRegister({
       name: "WakhanCoverageTrack",
       track: WakhanCoverageTrack,
       config: WakhanCoverageTrack.config,
-    });
+    }, { force: true });
     higlassRegister({
       name: "WakhanStructuralVariationTrack",
       track: WakhanStructuralVariationTrack,
       config: WakhanStructuralVariationTrack.config,
-    });
+    }, { force: true });
+    higlassRegister({
+      name: "HorizontalGeneAnnotationsTrack",
+      track: HorizontalGeneAnnotationsTrack,
+      config: HorizontalGeneAnnotationsTrack.config,
+    }, { force: true });
     // higlassRegister({
     //   name: "OrthologsTrack",
     //   track: OrthologsTrack,

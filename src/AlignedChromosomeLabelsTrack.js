@@ -1,23 +1,9 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo } from "smaht-higlass-misc/es/chrom-utils";
+import { getPlotBounds, mapTrackX, PLOT_LEFT } from "./plotBounds";
 
 const AXIS_COLOR = "#808080";
 const TEXT_STROKE = "#ffffff";
-const PLOT_LEFT = 72;
-const PLOT_RIGHT_MARGIN = 78;
-
-function plotBounds(track) {
-  const right = Math.max(PLOT_LEFT + 1, track.dimensions[0] - PLOT_RIGHT_MARGIN);
-  return { left: PLOT_LEFT, right };
-}
-
-function plotX(track, absPosition) {
-  const { left, right } = plotBounds(track);
-  const rawX = track._xScale(absPosition);
-  const rawWidth = Math.max(1, track.dimensions[0]);
-  return left + (rawX / rawWidth) * (right - left);
-}
-
 function AlignedChromosomeLabelsTrack(HGC, ...args) {
   class AlignedChromosomeLabelsTrackClass extends BaseTrack(HGC, ...args) {
     constructor(context, options) {
@@ -83,7 +69,7 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
         return;
       }
 
-      const { left, right } = plotBounds(this);
+      const { left, right } = getPlotBounds(this);
       const y = this.dimensions[1] / 2;
 
       this.chromInfo.cumPositions.forEach((chromosome) => {
@@ -92,8 +78,8 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
           return;
         }
 
-        const startX = Math.max(left, plotX(this, chromosome.pos));
-        const endX = Math.min(right, plotX(this, chromosome.pos + chrLength));
+        const startX = Math.max(left, mapTrackX(this, chromosome.pos));
+        const endX = Math.min(right, mapTrackX(this, chromosome.pos + chrLength));
         if (endX <= left || startX >= right || endX <= startX) {
           return;
         }

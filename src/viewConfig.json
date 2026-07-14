@@ -25,10 +25,11 @@
         "tracks": {
           "top": [
             {
-              "type": "horizontal-gene-annotations",
+              "type": "aligned-horizontal-gene-annotations",
               "height": 60,
               "tilesetUid": "OHJakQICQD6gTD7skx4EWA",
               "server": "https://higlass.io/api/v1",
+              "chromInfoPath": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
               "uid": "OHJakQICQD6gTD7skx4EWA",
               "options": {
                 "name": "Gene Annotations (hg19)",
@@ -84,7 +85,7 @@
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "data":[]
               },
-              "height": 140,
+              "height": 200,
               "uid": "scanner-result-track-1",
               "width": 450
             },
@@ -111,7 +112,7 @@
                   "matchedIds": []
                 }
               },
-              "height": 150,
+              "height": 220,
               "uid": "wakhan-sv-track",
               "width": 450
             },
@@ -143,7 +144,7 @@
                   "matchedIds": []
                 }
               },
-              "height": 270,
+              "height": 400,
               "uid": "wakhan-coverage-track",
               "width": 450
             },
@@ -158,7 +159,7 @@
                 "hpFilter": "2",
                 "showTrack": true,
                 "layoutAfterUid": "wakhan-coverage-track",
-                "layoutHeight": 120,
+                "layoutHeight": 220,
                 "collapsedHeight": 1,
                 "svMode": "matched",
                 "visibleTypes": {
@@ -175,7 +176,7 @@
                   "matchedIds": []
                 }
               },
-              "height": 120,
+              "height": 220,
               "uid": "wakhan-hp-sv-track",
               "width": 450
             }

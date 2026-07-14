@@ -1,6 +1,7 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
+import { getPlotBounds, mapTrackX, unmapTrackX } from "./plotBounds";
 
 const HP1_COLOR = "#B23A48";
 const HP1_POINT_COLOR = "#D95F65";
@@ -460,8 +461,7 @@ function WakhanCoverageTrack(HGC, ...args) {
     metrics() {
       const top = 0;
       const bottom = 0;
-      const leftAxisX = 72;
-      const rightAxisX = this.dimensions[0] - 78;
+      const { left: leftAxisX, right: rightAxisX } = getPlotBounds(this);
       const height = Math.max(1, this.dimensions[1] - top - bottom);
       const centerY = top + height / 2;
       const halfHeight = height / 2 - 1;
@@ -486,16 +486,12 @@ function WakhanCoverageTrack(HGC, ...args) {
 
     plotX(absPosition) {
       const { leftAxisX, rightAxisX } = this.metrics();
-      const rawX = this._xScale(absPosition);
-      const rawWidth = Math.max(1, this.dimensions[0]);
-      return leftAxisX + (rawX / rawWidth) * (rightAxisX - leftAxisX);
+      return mapTrackX(this, absPosition);
     }
 
     plotAbsFromX(trackX) {
       const { leftAxisX, rightAxisX } = this.metrics();
-      const plotWidth = Math.max(1, rightAxisX - leftAxisX);
-      const rawX = ((trackX - leftAxisX) / plotWidth) * this.dimensions[0];
-      return this._xScale.invert(rawX);
+      return unmapTrackX(this, trackX);
     }
 
     addText(text, x, y, options = {}) {

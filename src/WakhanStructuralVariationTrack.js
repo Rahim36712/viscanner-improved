@@ -1,6 +1,7 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
+import { getPlotBounds, mapTrackX } from "./plotBounds";
 
 const TYPE_COLORS = {
   DEL: "#F27A9A",
@@ -221,8 +222,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     metrics() {
       const top = this.hpLaneMode ? 4 : 0;
       const bottom = this.hpLaneMode ? 4 : 0;
-      const leftAxisX = 72;
-      const rightAxisX = this.dimensions[0] - 78;
+      const { left: leftAxisX, right: rightAxisX } = getPlotBounds(this);
       const height = Math.max(1, this.dimensions[1] - top - bottom);
       const baselineY = this.hpFilter === "2" && !this.hpLaneMode
         ? top + 2
@@ -233,9 +233,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
     plotX(absPosition) {
       const { leftAxisX, rightAxisX } = this.metrics();
-      const rawX = this._xScale(absPosition);
-      const rawWidth = Math.max(1, this.dimensions[0]);
-      return leftAxisX + (rawX / rawWidth) * (rightAxisX - leftAxisX);
+      return mapTrackX(this, absPosition);
     }
 
     addText(text, x, y, options = {}) {

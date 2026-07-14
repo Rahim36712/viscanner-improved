@@ -1,28 +1,14 @@
 import OriginalScannerResultTrack from "smaht-higlass-misc/es/ScannerResultTrack";
+import { getPlotBounds, mapTrackX } from "./plotBounds";
 
 const CHROM_BAND_COLOR = "#e7eaed";
 const BAF_COLOR = "#9A9D32";
-const PLOT_LEFT = 72;
-const PLOT_RIGHT_MARGIN = 78;
-
-function plotBounds(track) {
-  const right = Math.max(PLOT_LEFT + 1, track.dimensions[0] - PLOT_RIGHT_MARGIN);
-  return { left: PLOT_LEFT, right };
-}
-
-function plotX(track, absPosition) {
-  const { left, right } = plotBounds(track);
-  const rawX = track._xScale(absPosition);
-  const rawWidth = Math.max(1, track.dimensions[0]);
-  return left + (rawX / rawWidth) * (right - left);
-}
-
 function drawChromosomeBands(track) {
   if (!track.chromInfo || !track.chromInfo.cumPositions) {
     return;
   }
 
-  const { left, right } = plotBounds(track);
+  const { left, right } = getPlotBounds(track);
   const bandColor = track.HGC.utils.colorToHex(CHROM_BAND_COLOR);
   track.chromInfo.cumPositions.forEach((chromosome, index) => {
     if (index % 2 !== 0) {
@@ -34,8 +20,8 @@ function drawChromosomeBands(track) {
       return;
     }
 
-    const startX = Math.max(left, plotX(track, chromosome.pos));
-    const endX = Math.min(right, plotX(track, chromosome.pos + chrLength));
+    const startX = Math.max(left, mapTrackX(track, chromosome.pos));
+    const endX = Math.min(right, mapTrackX(track, chromosome.pos + chrLength));
     if (endX <= left || startX >= right || endX <= startX) {
       return;
     }
@@ -46,7 +32,7 @@ function drawChromosomeBands(track) {
 }
 
 function drawPlotGrid(track) {
-  const { left, right } = plotBounds(track);
+  const { left, right } = getPlotBounds(track);
   track.bgGraphics.beginFill(track.HGC.utils.colorToHex("#ebebeb"));
   track.legendUtils.currentLegendLevels.forEach((yLevel) => {
     track.bgGraphics.drawRect(left, yLevel, right - left, 1);
@@ -134,8 +120,8 @@ function ScannerResultTrackPatched(HGC, ...args) {
 
     this.segmentGraphics.beginFill(snpColorHex, 0.4);
     this.currentFilteredListSnp.forEach((segment) => {
-      const xPos = isBafTrack ? plotX(this, segment.posAbs) : this._xScale(segment.posAbs);
-      const bounds = plotBounds(this);
+      const xPos = isBafTrack ? mapTrackX(this, segment.posAbs) : this._xScale(segment.posAbs);
+      const bounds = getPlotBounds(this);
       if (isBafTrack && (xPos < bounds.left || xPos > bounds.right)) {
         return;
       }
@@ -143,12 +129,12 @@ function ScannerResultTrackPatched(HGC, ...args) {
     });
 
     this.currentFilteredList.forEach((segment) => {
-      const bounds = plotBounds(this);
+      const bounds = getPlotBounds(this);
       const xPos = isBafTrack
-        ? Math.max(bounds.left, plotX(this, segment.fromAbs))
+        ? Math.max(bounds.left, mapTrackX(this, segment.fromAbs))
         : this._xScale(segment.fromAbs);
       const xEnd = isBafTrack
-        ? Math.min(bounds.right, plotX(this, segment.toAbs))
+        ? Math.min(bounds.right, mapTrackX(this, segment.toAbs))
         : this._xScale(segment.toAbs);
       const width = xEnd - xPos;
       if (isBafTrack && width <= 0) {

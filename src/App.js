@@ -293,7 +293,7 @@ function App() {
         <div id="overlay-text"><i className="fas fa fa-spin fa-spinner mr-1"></i>Loading data</div>
       </div>
 
-      <div className="container mt-5">
+      <div className="container-fluid px-4 mt-5">
         <h2 id="variant-view" className="text-center">
           HiScanner output visualization
         </h2>
