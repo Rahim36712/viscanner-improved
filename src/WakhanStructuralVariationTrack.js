@@ -395,9 +395,10 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       let startY = baselineY;
       let endY = baselineY;
       let apexY;
+      const multiplier = this.options.arcHeightMultiplier !== undefined ? Number(this.options.arcHeightMultiplier) : 1.0;
       if (this.hpLaneMode) {
         const laneHeight = Math.max(18, height / 2 - 6);
-        const laneLift = 8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6);
+        const laneLift = (8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6)) * multiplier;
         if (variant.hp === "1") {
           startY = centerY - 4;
           endY = centerY - 4;
@@ -408,7 +409,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           apexY = Math.min(top + height - 2, startY + laneLift);
         }
       } else {
-        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
+        const arcLift = (10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14)) * multiplier;
         if (this.hpFilter === "2") {
           apexY = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
         } else {
@@ -452,18 +453,19 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       const plotWidth = Math.max(1, rightAxisX - leftAxisX);
       let markerTop = baselineY;
       let markerBottom = baselineY;
+      const multiplier = this.options.arcHeightMultiplier !== undefined ? Number(this.options.arcHeightMultiplier) : 1.0;
       if (this.hpFilter === "2" && !this.hpLaneMode) {
         markerTop = baselineY;
-        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
+        const arcLift = (10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14)) * multiplier;
         markerBottom = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
       } else if (!this.hpLaneMode) {
-        const arcLift = 10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14);
+        const arcLift = (10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14)) * multiplier;
         markerTop = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
         markerBottom = baselineY;
       }
       if (this.hpLaneMode) {
         const laneHeight = Math.max(18, height / 2 - 6);
-        const laneLift = 8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6);
+        const laneLift = (8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6)) * multiplier;
         if (variant.hp === "1") {
           markerBottom = centerY - 4;
           markerTop = Math.max(top + 2, markerBottom - laneLift);
@@ -614,6 +616,7 @@ WakhanStructuralVariationTrack.config = {
     "showTrack",
     "svMode",
     "visibleTypes",
+    "arcHeightMultiplier",
   ],
   defaultOptions: {
     data: [],
@@ -625,6 +628,7 @@ WakhanStructuralVariationTrack.config = {
     showTrack: true,
     svMode: DEFAULT_SV_MODE,
     visibleTypes: DEFAULT_VISIBLE_TYPES,
+    arcHeightMultiplier: 1.0,
   },
   optionsInfo: {},
 };
