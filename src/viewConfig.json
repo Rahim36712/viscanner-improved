@@ -111,9 +111,10 @@
                   "variants": [],
                   "matchedIds": []
                 },
-                "arcHeightMultiplier": 2.5
+                "arcHeightMultiplier": 5.0,
+                "layoutHeight": 90
               },
-              "height": 70,
+              "height": 90,
               "uid": "wakhan-sv-track",
               "width": 450
             },
@@ -160,7 +161,7 @@
                 "hpFilter": "2",
                 "showTrack": true,
                 "layoutAfterUid": "wakhan-coverage-track",
-                "layoutHeight": 70,
+                "layoutHeight": 90,
                 "collapsedHeight": 1,
                 "svMode": "matched",
                 "visibleTypes": {
@@ -176,9 +177,9 @@
                   "variants": [],
                   "matchedIds": []
                 },
-                "arcHeightMultiplier": 2.5
+                "arcHeightMultiplier": 5.0
               },
-              "height": 70,
+              "height": 90,
               "uid": "wakhan-hp-sv-track",
               "width": 450
             }

@@ -402,18 +402,22 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         if (variant.hp === "1") {
           startY = centerY - 4;
           endY = centerY - 4;
-          apexY = Math.max(top + 2, startY - laneLift);
+          const targetY = Math.max(top + 2, startY - Math.min(laneHeight - 2, laneLift));
+          apexY = 2 * targetY - startY;
         } else {
           startY = centerY + 4;
           endY = centerY + 4;
-          apexY = Math.min(top + height - 2, startY + laneLift);
+          const targetY = Math.min(top + height - 2, startY + Math.min(laneHeight - 2, laneLift));
+          apexY = 2 * targetY - startY;
         }
       } else {
         const arcLift = (10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14)) * multiplier;
         if (this.hpFilter === "2") {
-          apexY = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
+          const targetY = Math.min(top + height - 2, baselineY + Math.min(height - 4, arcLift));
+          apexY = 2 * targetY - baselineY;
         } else {
-          apexY = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
+          const targetY = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
+          apexY = 2 * targetY - baselineY;
         }
       }
       const controlX = (x1 + x2) / 2;
@@ -628,7 +632,7 @@ WakhanStructuralVariationTrack.config = {
     showTrack: true,
     svMode: DEFAULT_SV_MODE,
     visibleTypes: DEFAULT_VISIBLE_TYPES,
-    arcHeightMultiplier: 1.0,
+    arcHeightMultiplier: 5.0,
   },
   optionsInfo: {},
 };
