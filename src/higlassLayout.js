@@ -180,8 +180,11 @@ function applyTrackOptions(viewConfig, trackOptionsByUid = {}) {
   });
 }
 
-function applyLayoutToViewConfig(viewConfig) {
+function applyLayoutToViewConfig(viewConfig, actualHeight) {
   (viewConfig.views || []).forEach((view) => {
+    let baseTotalHeight = 0;
+    const visibleTracks = [];
+
     ["top", "center", "bottom"].forEach((position) => {
       const tracks = view.tracks && view.tracks[position];
       if (!Array.isArray(tracks)) {
@@ -190,8 +193,23 @@ function applyLayoutToViewConfig(viewConfig) {
 
       normalizeTrackOrder(tracks);
       tracks.forEach((track) => {
-        track.height = layoutHeightForTrack(track);
+        const height = layoutHeightForTrack(track);
+        if (isLayoutVisible(track)) {
+          baseTotalHeight += height;
+          visibleTracks.push({ track, baseHeight: height });
+        } else {
+          track.height = height;
+        }
       });
+    });
+
+    const targetTrackAreaHeight = actualHeight
+      ? Math.max(baseTotalHeight, actualHeight - VIEW_CHROME_HEIGHT)
+      : baseTotalHeight;
+    const scale = targetTrackAreaHeight / Math.max(1, baseTotalHeight);
+
+    visibleTracks.forEach(({ track, baseHeight }) => {
+      track.height = Math.round(baseHeight * scale);
     });
   });
 }
@@ -277,6 +295,11 @@ export function fitToContent(options = {}) {
   }
 
   const viewUid = options.viewUid || currentConfig.views?.[0]?.uid || DEFAULT_VIEW_UID;
+  
+  const container = getContainer();
+  const gridItem = container ? container.querySelector(".react-grid-item") : null;
+  const actualHeight = gridItem ? gridItem.offsetHeight : null;
+
   const previousLocation =
     options.resetLocation || options.preserveLocation === false
       ? null
@@ -284,7 +307,7 @@ export function fitToContent(options = {}) {
   const nextConfig = cloneConfig(currentConfig);
 
   applyTrackOptions(nextConfig, options.trackOptionsByUid);
-  applyLayoutToViewConfig(nextConfig);
+  applyLayoutToViewConfig(nextConfig, actualHeight);
 
   const layout = calculateLayout(nextConfig);
   resizeContainer(layout);

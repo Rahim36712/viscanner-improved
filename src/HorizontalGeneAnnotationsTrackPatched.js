@@ -43,6 +43,13 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
   function drawChromosomeBands() {
     if (!bandGraphics) return;
     bandGraphics.clear();
+
+    if (instance.pMain) {
+      const main = instance.pMain;
+      bandGraphics.scale.x = 1 / (main.scale.x || 1);
+      bandGraphics.position.x = -(main.position.x || 0) / (main.scale.x || 1);
+    }
+
     if (!chromInfo || !chromInfo.cumPositions || !instance.dimensions) {
       return;
     }
@@ -51,7 +58,7 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
     const height = instance.dimensions[1];
     const { left, right } = getPlotBounds(instance);
     const bandColor = HGC.utils.colorToHex(CHROM_BAND_COLOR);
-    const startY = instance.position ? instance.position[1] : 0;
+    const startY = 0;
 
     chromInfo.cumPositions.forEach((chromosome, index) => {
       if (index % 2 !== 0) {
@@ -206,6 +213,14 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
 
     drawChromosomeBands();
   };
+
+  if (typeof instance.zoomed === "function") {
+    const originalZoomed = instance.zoomed.bind(instance);
+    instance.zoomed = function patchedZoomed(newXScale, newYScale) {
+      originalZoomed(newXScale, newYScale);
+      drawChromosomeBands();
+    };
+  }
 
   return instance;
 }

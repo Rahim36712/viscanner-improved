@@ -453,6 +453,11 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.updateExistingGraphics();
     }
 
+    setDimensions(newDimensions) {
+      super.setDimensions(newDimensions);
+      this.updateExistingGraphics();
+    }
+
     resetCache() {
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;

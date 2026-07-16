@@ -113,11 +113,51 @@ export class HiglassBrowser extends React.PureComponent {
       }
     };
     window.addEventListener("resize", this.handleWindowResize);
+
+    if (typeof ResizeObserver !== "undefined" && typeof MutationObserver !== "undefined") {
+      const container = document.getElementById("higlass-container");
+      if (container) {
+        let lastProcessedHeight = 0;
+
+        const setupGridItemObserver = (gridItem) => {
+          this.gridItemObserver = new ResizeObserver(() => {
+            const currentHeight = gridItem.offsetHeight;
+            if (currentHeight > 0 && currentHeight !== lastProcessedHeight) {
+              lastProcessedHeight = currentHeight;
+              scheduleFitToContent({ delay: 20 });
+            }
+          });
+          this.gridItemObserver.observe(gridItem);
+        };
+
+        const existingGridItem = container.querySelector(".react-grid-item");
+        if (existingGridItem) {
+          setupGridItemObserver(existingGridItem);
+        } else {
+          this.mutationObserver = new MutationObserver(() => {
+            const gridItem = container.querySelector(".react-grid-item");
+            if (gridItem) {
+              setupGridItemObserver(gridItem);
+              this.mutationObserver.disconnect();
+              this.mutationObserver = null;
+            }
+          });
+          this.mutationObserver.observe(container, { childList: true, subtree: true });
+        }
+      }
+    }
+
     scheduleFitToContent({ delay: 0 });
   }
 
   componentWillUnmount() {
     window.removeEventListener("resize", this.handleWindowResize);
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+    }
+    if (this.gridItemObserver) {
+      this.gridItemObserver.disconnect();
+    }
   }
 
   render() {

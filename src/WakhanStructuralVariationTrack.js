@@ -195,6 +195,11 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.resetCache();
     }
 
+    setDimensions(newDimensions) {
+      super.setDimensions(newDimensions);
+      this.updateExistingGraphics();
+    }
+
     resetCache() {
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
