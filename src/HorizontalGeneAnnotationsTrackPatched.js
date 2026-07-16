@@ -1,7 +1,5 @@
-import { ChromosomeInfo } from "smaht-higlass-misc/es/chrom-utils";
-import { getPlotBounds, mapTrackX, PLOT_LEFT, PLOT_RIGHT_MARGIN } from "./plotBounds";
+import { getPlotBounds, mapTrackX } from "./plotBounds";
 
-const CHROM_BAND_COLOR = "#e7eaed";
 const TRACK_TYPE = "aligned-horizontal-gene-annotations";
 
 function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
@@ -16,78 +14,9 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
   // internals (including stretchRects and zooming) work perfectly.
   const instance = new OriginalTrack(...args);
 
-  // Setup PIXI Graphics for alternating chromosome bands
-  const PIXI = HGC.libraries?.PIXI || window.PIXI;
-  let bandGraphics = null;
-  if (PIXI && instance.pBackground) {
-    bandGraphics = new PIXI.Graphics();
-    instance.pBackground.addChild(bandGraphics);
-  }
-
-  let chromInfo = null;
-  const context = args[0]; // first element in ...args is context
-  const chromSizesUrl =
-    instance.options.chromSizesUrl ||
-    instance.options.chromInfoPath ||
-    context?.chromInfoPath;
-
-  if (chromSizesUrl && ChromosomeInfo) {
-    ChromosomeInfo(chromSizesUrl, (info) => {
-      chromInfo = info;
-      if (instance.draw) {
-        instance.draw();
-      }
-    });
-  }
-
-  function drawChromosomeBands() {
-    if (!bandGraphics) return;
-    bandGraphics.clear();
-
-    if (instance.pMain) {
-      const main = instance.pMain;
-      bandGraphics.scale.x = 1 / (main.scale.x || 1);
-      bandGraphics.position.x = -(main.position.x || 0) / (main.scale.x || 1);
-    }
-
-    if (!chromInfo || !chromInfo.cumPositions || !instance.dimensions) {
-      return;
-    }
-
-    const width = instance.dimensions[0];
-    const height = instance.dimensions[1];
-    const { left, right } = getPlotBounds(instance);
-    const bandColor = HGC.utils.colorToHex(CHROM_BAND_COLOR);
-    const startY = 0;
-
-    chromInfo.cumPositions.forEach((chromosome, index) => {
-      if (index % 2 !== 0) {
-        return;
-      }
-
-      const chrLength = Number(chromInfo.chromLengths[chromosome.chr]);
-      if (!Number.isFinite(chrLength)) {
-        return;
-      }
-
-      // Map chromosome boundaries using the standard mapTrackX helper
-      const startX = Math.max(left, mapTrackX(instance, chromosome.pos));
-      const endX = Math.min(right, mapTrackX(instance, chromosome.pos + chrLength));
-
-      if (endX <= left || startX >= right || endX <= startX) {
-        return;
-      }
-
-      bandGraphics.beginFill(bandColor, 0.85);
-      bandGraphics.drawRect(startX, startY, endX - startX, height);
-      bandGraphics.endFill();
-    });
-  }
-
   // Hook into draw() to:
   // 1. Perform original draw logic (which renders genes/labels in uncompressed [0, width] space)
   // 2. Compress and translate the PIXI graphics container of each tile to [72, width - 78]
-  // 3. Clear and redraw background bands using the compressed coordinates
   const originalDraw = instance.draw.bind(instance);
   instance.draw = function patchedDraw() {
     originalDraw();
@@ -210,17 +139,7 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
         );
       });
     }
-
-    drawChromosomeBands();
   };
-
-  if (typeof instance.zoomed === "function") {
-    const originalZoomed = instance.zoomed.bind(instance);
-    instance.zoomed = function patchedZoomed(newXScale, newYScale) {
-      originalZoomed(newXScale, newYScale);
-      drawChromosomeBands();
-    };
-  }
 
   return instance;
 }
