@@ -412,6 +412,9 @@ export class CnvTable extends React.PureComponent {
               <div className="my-1">
                 HiScanner visualization output file (required)
               </div>
+              <div className="small text-muted mb-1">
+                Include grch38.cen_coord.curated.bed to show masked regions
+              </div>
               <Uploader populateTable={(d) => this.populateTable(d)} />
             </div>
           </div>

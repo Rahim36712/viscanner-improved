@@ -28,6 +28,7 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
 const DEFAULT_SV_MODE = "matched";
 const DEFAULT_SHOW_HP_SV_TRACK = true;
 const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = true;
+const DEFAULT_SHOW_MASKED_REGIONS = false;
 const DEFAULT_MAX_SV_SPAN = 0;
 
 function updateWakhanTrackVisibility(visibility) {
@@ -161,6 +162,9 @@ function SvVisibilityControls() {
   const [showSvLinesInCopyNumber, setShowSvLinesInCopyNumber] = React.useState(
     DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER
   );
+  const [showMaskedRegions, setShowMaskedRegions] = React.useState(
+    DEFAULT_SHOW_MASKED_REGIONS
+  );
   const [maxSvSpan, setMaxSvSpan] = React.useState(DEFAULT_MAX_SV_SPAN);
 
   const handleMaxSvSpanChange = (e) => {
@@ -182,9 +186,10 @@ function SvVisibilityControls() {
       visibleTypes: visibility,
       svMode,
       showSvBreakpoints: showSvLinesInCopyNumber,
+      showMaskedRegions,
       maxVariantLength: maxLen,
     });
-  }, [visibility, svMode, showSvLinesInCopyNumber, maxSvSpan]);
+  }, [visibility, svMode, showSvLinesInCopyNumber, showMaskedRegions, maxSvSpan]);
 
   React.useEffect(() => {
     updateHpSvTrackVisibility(showHpSvTrack);
@@ -238,6 +243,14 @@ function SvVisibilityControls() {
             onChange={() => setShowSvLinesInCopyNumber((current) => !current)}
           />
           <span>SV lines in copy-number plot</span>
+        </label>
+        <label className="wakhan-visibility-option">
+          <input
+            type="checkbox"
+            checked={showMaskedRegions}
+            onChange={() => setShowMaskedRegions((current) => !current)}
+          />
+          <span>Masked regions in copy-number plot</span>
         </label>
       </div>
       <div className="sv-control-section">

@@ -190,6 +190,57 @@ function ScannerResultTrackPatched(HGC, ...args) {
     return originalCreateLegendGraphics(maxValue);
   };
 
+  const originalExportSVG = instance.exportSVG.bind(instance);
+  instance.exportSVG = function patchedExportSVG() {
+    const renderer = HGC.services.pixiRenderer;
+    const originalBase64 = renderer.plugins.extract.base64.bind(renderer.plugins.extract);
+
+    renderer.plugins.extract.base64 = (target) => {
+      const scale = 8;
+      try {
+        const renderTexture = renderer.generateTexture(
+          target,
+          HGC.libraries.PIXI.SCALE_MODES.LINEAR,
+          scale
+        );
+        const b64 = originalBase64(renderTexture);
+        renderTexture.destroy(true);
+
+        // Reset render texture system to default screen to prevent blank screen issues
+        try {
+          renderer.renderTexture.bind(null);
+        } catch (e) {}
+
+        return b64;
+      } catch (err) {
+        console.warn("High-resolution base64 capture failed, falling back:", err);
+        return originalBase64(target);
+      }
+    };
+
+    let result;
+    try {
+      result = originalExportSVG();
+    } finally {
+      renderer.plugins.extract.base64 = originalBase64;
+    }
+
+    try {
+      if (result && result[0]) {
+        const image = result[0].querySelector("image");
+        if (image) {
+          const bounds = this.pMain.parent.parent.getBounds();
+          image.setAttribute("width", bounds.width);
+          image.setAttribute("height", bounds.height);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to set SVG image dimensions:", err);
+    }
+
+    return result;
+  };
+
   return instance;
 }
 

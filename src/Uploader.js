@@ -230,7 +230,7 @@ function parseWakhanCoverageData(v) {
         return;
       }
 
-      const segment = r.split("\t");
+      const segment = r.trim().split(/\s+/);
       rows.push({
         chr: normalizeChromosome(segment[0]),
         start: parseInt(segment[1], 10),
@@ -238,6 +238,30 @@ function parseWakhanCoverageData(v) {
         hp1: parseFloat(segment[3]),
         hp2: parseFloat(segment[4]),
         unphased: parseFloat(segment[5]),
+      });
+    });
+  return rows;
+}
+
+function parseMaskedRegionBed(v) {
+  const rows = [];
+  v.trim()
+    .split(/\r?\n/)
+    .forEach((r) => {
+      if (!r || r.startsWith("#")) {
+        return;
+      }
+
+      const segment = r.trim().split(/\s+/);
+      const start = parseInt(segment[1], 10);
+      const end = parseInt(segment[2], 10);
+      if (!segment[0] || !Number.isFinite(start) || !Number.isFinite(end)) {
+        return;
+      }
+      rows.push({
+        chr: normalizeChromosome(segment[0]),
+        start,
+        end,
       });
     });
   return rows;
@@ -418,7 +442,7 @@ function updateWakhanStructuralVariationTrack(data) {
   hgc.api.setViewConfig(viewconfCohort);
 }
 
-function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments) {
+function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = []) {
   const hgc = window.hgc.current;
   const viewconfCohort = hgc.api.getViewConfig();
 
@@ -433,6 +457,7 @@ function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments) {
       coverage: coverageRows,
       hp1Segments,
       hp2Segments,
+      maskedRegions,
     });
   }
 
@@ -469,6 +494,16 @@ function showUploadError(message) {
 
 function parseUploadedEntryTexts(entryTexts, props) {
   let matchedSvIds = [];
+  const maskedRegionFilename = Object.keys(entryTexts).find((filename) => {
+    const lowerFilename = filename.toLowerCase();
+    return (
+      lowerFilename === "grch38.cen_coord.curated.bed" ||
+      (lowerFilename.includes("cen_coord") && lowerFilename.endsWith(".bed"))
+    );
+  });
+  const maskedRegions = maskedRegionFilename
+    ? parseMaskedRegionBed(entryTexts[maskedRegionFilename])
+    : [];
 
   if (entryTexts["cna_short.txt"]) {
     props.populateTable(parseHiglassData(entryTexts["cna_short.txt"]));
@@ -506,7 +541,8 @@ function parseUploadedEntryTexts(entryTexts, props) {
         updateWakhanCoverageTracks(
           parseWakhanCoverageData(entryTexts["phase_corrected_coverage.csv"]),
           hp1Segments,
-          hp2Segments
+          hp2Segments,
+          maskedRegions
         );
       } else {
         updateCopyNumberTracks(wakhanData, false);
