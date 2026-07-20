@@ -642,10 +642,7 @@ function WakhanCoverageTrack(HGC, ...args) {
           if (variantLength(variant) < minLength) {
             return;
           }
-          if (maxLength && variant.chr === variant.chr2 && variantLength(variant) > maxLength) {
-            return;
-          }
-          if (maxLength && variant.chr2 && variant.chr !== variant.chr2) {
+          if (maxLength && variant.chr === variant.chr2 && variantLength(variant) < maxLength) {
             return;
           }
           if (this.visibleSvTypes[variant.type] === false) {

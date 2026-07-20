@@ -142,13 +142,6 @@ object-assign
  */
 
 /*!
- * The buffer module from node.js, for the browser.
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-
-/*!
  * resource-loader - v3.0.1
  * https://github.com/pixijs/pixi-sound
  * Compiled Tue, 02 Jul 2019 14:06:18 UTC

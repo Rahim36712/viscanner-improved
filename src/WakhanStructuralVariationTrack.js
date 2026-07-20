@@ -361,10 +361,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           return false;
         }
         const maxLength = this.maxVariantLength;
-        if (maxLength && variant.chr === variant.chr2 && variantLength(variant) > maxLength) {
-          return false;
-        }
-        if (maxLength && variant.chr2 && variant.chr !== variant.chr2) {
+        if (maxLength && variant.chr === variant.chr2 && variantLength(variant) < maxLength) {
           return false;
         }
         if (this.visibleTypes[variant.type] === false) {

@@ -258,7 +258,7 @@ function SvVisibilityControls() {
       ))}
       </div>
       <div className="sv-control-section">
-        <div className="sv-control-section-title">SV max span</div>
+        <div className="sv-control-section-title">SV min span</div>
         <div className="sv-max-span-input">
           <input
             type="number"

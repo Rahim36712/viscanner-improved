@@ -15,6 +15,7 @@
     "generic-filehandle": "3.0.0",
     "higlass": "1.12.4",
     "higlass-text": "^0.1.6",
+    "html2canvas": "^1.4.1",
     "pixi.js": "^5.2.4",
     "process": "^0.11.10",
     "react": "^17.0.2",

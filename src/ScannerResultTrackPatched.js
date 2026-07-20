@@ -125,7 +125,13 @@ function ScannerResultTrackPatched(HGC, ...args) {
       if (isBafTrack && (xPos < bounds.left || xPos > bounds.right)) {
         return;
       }
-      this.segmentGraphics.drawCircle(xPos, this.currentYScalePoints(segment.yvalue), 3);
+      // BAF points are drawn smaller for denser, cleaner scatter
+      const pointRadius = isBafTrack ? 1.5 : 3;
+      this.segmentGraphics.drawCircle(
+        xPos,
+        this.currentYScalePoints(segment.yvalue),
+        pointRadius
+      );
     });
 
     this.currentFilteredList.forEach((segment) => {
