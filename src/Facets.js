@@ -5,6 +5,7 @@ import React from "react";
 import { GeneSearchBox } from "./GeneSearchBox";
 import { ChromosomeInfo } from "higlass/dist/hglib";
 import { resetHiglassView, scheduleFitToContent } from "./higlassLayout";
+import { exportSvgAsPdf } from "./pdfExport";
 // import Select from "react-select";
 
 // import viewConfigClinvar from "./viewConfig.clinvar.json";
@@ -31,34 +32,39 @@ export class Facets extends React.PureComponent {
     this.state = {
       region: "",
       regionError: false,
-      // activeConsequenceLevels: [CL_HIGH, CL_MODERATE, CL_LOW, CL_MODIFIER],
-      // selectedKeggCategory: null,
-      // selectedStatisticalTest: SELECTED_STATISTICAL_TEST,
-      // isTranscriptsTrackVisible: false,
-      // isClinvarTrackVisible: false,
-      // isGnomadTrackVisible: false,
-      // isOrthologsTrackVisible: false,
     };
   }
 
   componentDidMount() {}
 
-  exportDisplay = () => {
+  exportDisplay = async () => {
     const hgc = window.hgc.current;
     if (!hgc) {
       console.warn("Higlass component not found.");
       return;
     }
-    window.Buffer = window.Buffer || require("buffer").Buffer;
-    const svg = hgc.api.exportAsSvg();
 
-    var element = document.createElement("a");
-    element.setAttribute(
-      "href",
-      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg)
-    );
-    element.setAttribute("download", "cohort.svg");
-    element.click();
+    try {
+      const svg = hgc.api.exportAsSvg();
+      await exportSvgAsPdf(svg, "viscanner-cohort.pdf");
+    } catch (error) {
+      console.error("Failed to export the visualization as a PDF:", error);
+    } finally {
+      // Force HiGlass to re-render all Pixi tracks so the on-screen
+      // display is restored after the offscreen captures.
+      requestAnimationFrame(() => {
+        try {
+          if (hgc.pixiStage && hgc.pixiRenderer) {
+            hgc.pixiRenderer.render(hgc.pixiStage);
+          }
+          // Trigger a resize which forces all tracks to redraw
+          window.dispatchEvent(new Event("resize"));
+        } catch (e) {
+          // Last resort: force a resize event to trigger redraws
+          window.dispatchEvent(new Event("resize"));
+        }
+      });
+    }
   };
 
   addToRegion = (evt) => {
@@ -299,7 +305,7 @@ export class Facets extends React.PureComponent {
                 onClick={this.exportDisplay}
               >
                 <i className="icon icon-download icon-sm fas mr-1"></i>
-                Export display
+                Export PDF (vector)
               </button>
             </div>
           </div>
