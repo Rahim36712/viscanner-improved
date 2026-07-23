@@ -4,6 +4,61 @@ import { createHighResBase64Extractor } from "./pdfExport";
 
 const CHROM_BAND_COLOR = "#e7eaed";
 const BAF_COLOR = "#9A9D32";
+function getChromosomeDataBounds(track) {
+  const dataLen = track.data ? track.data.length : 0;
+  if (track._cachedChromBounds && track._cachedDataLen === dataLen) {
+    return track._cachedChromBounds;
+  }
+  if (!track.chromInfo || !track.chromInfo.cumPositions) {
+    return null;
+  }
+
+  const cumPositions = track.chromInfo.cumPositions;
+  const chromLengths = track.chromInfo.chromLengths;
+
+  const chrMaxEnd = new Map();
+  const chrMinStart = new Map();
+
+  const allSegments = track.data || [];
+  for (let i = 0; i < allSegments.length; i++) {
+    const seg = allSegments[i];
+    if (!seg.chr) continue;
+    const currentMax = chrMaxEnd.get(seg.chr);
+    if (currentMax === undefined || seg.toAbs > currentMax) {
+      chrMaxEnd.set(seg.chr, seg.toAbs);
+    }
+    const currentMin = chrMinStart.get(seg.chr);
+    if (currentMin === undefined || seg.fromAbs < currentMin) {
+      chrMinStart.set(seg.chr, seg.fromAbs);
+    }
+  }
+
+  const bounds = [];
+  for (let i = 0; i < cumPositions.length; i++) {
+    const cp = cumPositions[i];
+    const chrName = cp.chr;
+    const officialLen = Number(chromLengths[chrName]) || 0;
+    const officialStart = cp.pos;
+    const officialEnd = officialStart + officialLen;
+
+    const dataStart = chrMinStart.get(chrName);
+    const dataEnd = chrMaxEnd.get(chrName);
+
+    let startPos = dataStart !== undefined ? Math.min(officialStart, dataStart) : officialStart;
+    let endPos = dataEnd !== undefined ? dataEnd : officialEnd;
+
+    if (i > 0) {
+      startPos = bounds[i - 1].end;
+    }
+
+    bounds.push({ chr: chrName, start: startPos, end: endPos });
+  }
+
+  track._cachedChromBounds = bounds;
+  track._cachedDataLen = dataLen;
+  return bounds;
+}
+
 function drawChromosomeBands(track) {
   if (!track.chromInfo || !track.chromInfo.cumPositions) {
     return;
@@ -11,18 +66,28 @@ function drawChromosomeBands(track) {
 
   const { left, right } = getPlotBounds(track);
   const bandColor = track.HGC.utils.colorToHex(CHROM_BAND_COLOR);
+  const bounds = getChromosomeDataBounds(track);
+
   track.chromInfo.cumPositions.forEach((chromosome, index) => {
     if (index % 2 !== 0) {
       return;
     }
 
-    const chrLength = Number(track.chromInfo.chromLengths[chromosome.chr]);
-    if (!Number.isFinite(chrLength)) {
-      return;
+    let startPos, endPos;
+    if (bounds && bounds[index]) {
+      startPos = bounds[index].start;
+      endPos = bounds[index].end;
+    } else {
+      const chrLength = Number(track.chromInfo.chromLengths[chromosome.chr]);
+      if (!Number.isFinite(chrLength)) {
+        return;
+      }
+      startPos = chromosome.pos;
+      endPos = chromosome.pos + chrLength;
     }
 
-    const startX = Math.max(left, mapTrackX(track, chromosome.pos));
-    const endX = Math.min(right, mapTrackX(track, chromosome.pos + chrLength));
+    const startX = Math.max(left, mapTrackX(track, startPos));
+    const endX = Math.min(right, mapTrackX(track, endPos));
     if (endX <= left || startX >= right || endX <= startX) {
       return;
     }

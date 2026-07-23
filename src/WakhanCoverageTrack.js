@@ -618,19 +618,29 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
+      const bounds = this.getChromosomeDataBounds();
       const bandColor = this.HGC.utils.colorToHex(CHROM_BAND_COLOR);
+
       this.chromInfo.cumPositions.forEach((chromosome, index) => {
         if (index % 2 !== 0) {
           return;
         }
 
-        const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
-        if (!Number.isFinite(chrLength)) {
-          return;
+        let startPos, endPos;
+        if (bounds && bounds[index]) {
+          startPos = bounds[index].start;
+          endPos = bounds[index].end;
+        } else {
+          const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
+          if (!Number.isFinite(chrLength)) {
+            return;
+          }
+          startPos = chromosome.pos;
+          endPos = chromosome.pos + chrLength;
         }
 
-        const startX = Math.max(leftAxisX, this.plotX(chromosome.pos));
-        const endX = Math.min(rightAxisX, this.plotX(chromosome.pos + chrLength));
+        const startX = Math.max(leftAxisX, this.plotX(startPos));
+        const endX = Math.min(rightAxisX, this.plotX(endPos));
         if (endX <= leftAxisX || startX >= rightAxisX || endX <= startX) {
           return;
         }
