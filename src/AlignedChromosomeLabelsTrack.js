@@ -261,35 +261,43 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
       const renderer = HGC?.services?.pixiRenderer;
       const extractor = renderer ? createHighResBase64Extractor(HGC, 6) : null;
 
-      if (extractor) {
-        renderer.plugins.extract.base64 = extractor.highResBase64;
-      }
+      const gTrack = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      gTrack.setAttribute("class", "aligned-chromosome-labels-track");
 
-      let result;
-      try {
-        result = super.exportSVG();
-      } finally {
-        if (extractor) {
-          renderer.plugins.extract.base64 = extractor.originalBase64;
+      let imgB64 = null;
+      if (extractor) {
+        try {
+          imgB64 = extractor.highResBase64(this.pForeground || this.pMain);
+        } catch (e) {
+          console.warn("High-res capture fallback for Chromosome Labels:", e);
         }
       }
 
-      try {
-        if (result && result[0]) {
-          const image = result[0].querySelector("image");
-          if (image && this.pMain && this.pMain.parent && this.pMain.parent.parent) {
+      if (imgB64) {
+        const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        image.setAttribute("href", imgB64);
+        image.setAttribute("x", "0");
+        image.setAttribute("y", "0");
+
+        let width = this.dimensions[0];
+        let height = this.dimensions[1];
+
+        if (this.pMain && this.pMain.parent && this.pMain.parent.parent) {
+          try {
             const bounds = this.pMain.parent.parent.getBounds();
             if (bounds && bounds.width && bounds.height) {
-              image.setAttribute("width", bounds.width);
-              image.setAttribute("height", bounds.height);
+              width = bounds.width;
+              height = bounds.height;
             }
-          }
+          } catch (e) {}
         }
-      } catch (err) {
-        console.warn("Failed to set SVG image dimensions for chromosome labels track:", err);
+
+        image.setAttribute("width", String(width));
+        image.setAttribute("height", String(height));
+        gTrack.appendChild(image);
       }
 
-      return result;
+      return [gTrack, gTrack];
     }
   }
 

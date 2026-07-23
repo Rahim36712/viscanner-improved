@@ -37,6 +37,134 @@ function drawPlotGrid(track) {
   return;
 }
 
+function drawPatchedSegments(track, isBafTrack, segmentColorHex, blackColorHex) {
+  const bounds = getPlotBounds(track);
+
+  if (track.chromInfo && track.chromInfo.cumPositions) {
+    const cumPositions = track.chromInfo.cumPositions;
+    const chromLengths = track.chromInfo.chromLengths;
+
+    const segmentsByChr = new Map();
+    track.currentFilteredList.forEach((segment) => {
+      let matchedIndex = -1;
+      for (let i = 0; i < cumPositions.length; i++) {
+        const start = cumPositions[i].pos;
+        const length = Number(chromLengths[cumPositions[i].chr]) || 0;
+        const end = start + length;
+        if (segment.fromAbs >= start && segment.fromAbs <= end) {
+          matchedIndex = i;
+          break;
+        }
+      }
+      if (matchedIndex === -1 && cumPositions.length > 0) {
+        for (let i = 0; i < cumPositions.length; i++) {
+          const start = cumPositions[i].pos;
+          if (segment.fromAbs < start) {
+            matchedIndex = Math.max(0, i - 1);
+            break;
+          }
+          matchedIndex = i;
+        }
+      }
+
+      if (matchedIndex >= 0) {
+        if (!segmentsByChr.has(matchedIndex)) {
+          segmentsByChr.set(matchedIndex, []);
+        }
+        segmentsByChr.get(matchedIndex).push(segment);
+      }
+    });
+
+    segmentsByChr.forEach((chrSegments, chrIdx) => {
+      const cumPos = cumPositions[chrIdx];
+      const chrStart = cumPos.pos;
+      const chrEnd = chrStart + (Number(chromLengths[cumPos.chr]) || 0);
+
+      chrSegments.sort((a, b) => a.fromAbs - b.fromAbs);
+
+      const n = chrSegments.length;
+      for (let i = 0; i < n; i++) {
+        const segment = chrSegments[i];
+        let effFrom = segment.fromAbs;
+        let effTo = segment.toAbs;
+
+        // Snap 1st segment in chromosome to chromosome start
+        if (i === 0) {
+          effFrom = chrStart;
+        }
+        // Snap last segment in chromosome to chromosome end
+        if (i === n - 1) {
+          effTo = chrEnd;
+        }
+        // Snap adjacent segments together to eliminate gaps
+        if (i < n - 1) {
+          const nextSegment = chrSegments[i + 1];
+          if (nextSegment.fromAbs > effTo) {
+            effTo = nextSegment.fromAbs;
+          }
+        }
+
+        // Strict clamping to chromosome boundaries
+        effFrom = Math.max(chrStart, effFrom);
+        effTo = Math.min(chrEnd, effTo);
+
+        if (effTo <= effFrom) continue;
+
+        const xPos = isBafTrack
+          ? Math.max(bounds.left, mapTrackX(track, effFrom))
+          : track._xScale(effFrom);
+        const xEnd = isBafTrack
+          ? Math.min(bounds.right, mapTrackX(track, effTo))
+          : track._xScale(effTo);
+
+        const width = xEnd - xPos;
+        if (width <= 0) continue;
+
+        if (isBafTrack && (xEnd < bounds.left || xPos > bounds.right)) continue;
+
+        track.segmentGraphics.beginFill(segmentColorHex);
+        track.segmentGraphics.drawRect(
+          xPos,
+          track.currentYScaleSegments(segment.yvalue),
+          width,
+          track.options.segmentHeight
+        );
+
+        if (track.options.show_total_cn) {
+          track.segmentGraphics.beginFill(blackColorHex);
+          track.segmentGraphics.drawRect(xPos, track.currentYScalePoints(segment.total_cn), width, 2);
+        }
+      }
+    });
+    return;
+  }
+
+  // Fallback
+  track.currentFilteredList.forEach((segment) => {
+    const xPos = isBafTrack
+      ? Math.max(bounds.left, mapTrackX(track, segment.fromAbs))
+      : track._xScale(segment.fromAbs);
+    const xEnd = isBafTrack
+      ? Math.min(bounds.right, mapTrackX(track, segment.toAbs))
+      : track._xScale(segment.toAbs);
+    const width = xEnd - xPos;
+    if (width <= 0) return;
+
+    track.segmentGraphics.beginFill(segmentColorHex);
+    track.segmentGraphics.drawRect(
+      xPos,
+      track.currentYScaleSegments(segment.yvalue),
+      width,
+      track.options.segmentHeight
+    );
+
+    if (track.options.show_total_cn) {
+      track.segmentGraphics.beginFill(blackColorHex);
+      track.segmentGraphics.drawRect(xPos, track.currentYScalePoints(segment.total_cn), width, 2);
+    }
+  });
+}
+
 function ScannerResultTrackPatched(HGC, ...args) {
   const instance = OriginalScannerResultTrack(HGC, ...args);
 
@@ -132,30 +260,7 @@ function ScannerResultTrackPatched(HGC, ...args) {
       );
     });
 
-    this.currentFilteredList.forEach((segment) => {
-      const bounds = getPlotBounds(this);
-      const xPos = isBafTrack
-        ? Math.max(bounds.left, mapTrackX(this, segment.fromAbs))
-        : this._xScale(segment.fromAbs);
-      const xEnd = isBafTrack
-        ? Math.min(bounds.right, mapTrackX(this, segment.toAbs))
-        : this._xScale(segment.toAbs);
-      const width = xEnd - xPos;
-      if (isBafTrack && width <= 0) {
-        return;
-      }
-      this.segmentGraphics.beginFill(segmentColorHex);
-      this.segmentGraphics.drawRect(
-        xPos,
-        this.currentYScaleSegments(segment.yvalue),
-        width,
-        this.options.segmentHeight
-      );
-      if (this.options.show_total_cn) {
-        this.segmentGraphics.beginFill(blackColorHex);
-        this.segmentGraphics.drawRect(xPos, this.currentYScalePoints(segment.total_cn), width, 2);
-      }
-    });
+    drawPatchedSegments(this, isBafTrack, segmentColorHex, blackColorHex);
 
     this.loadingText.text = "";
   };
@@ -208,7 +313,14 @@ function ScannerResultTrackPatched(HGC, ...args) {
 
     try {
       if (result && result[0]) {
-        const image = result[0].querySelector("image");
+        const gTrack = result[0];
+
+        // Remove extra default SVG axis/legend line & path overlays
+        // appended by OriginalScannerResultTrack to gTrack
+        const axisOverlays = gTrack.querySelectorAll("g.axis, g.legend, g.y-axis, path, line");
+        axisOverlays.forEach((el) => el.remove());
+
+        const image = gTrack.querySelector("image");
         if (image && this.pMain && this.pMain.parent && this.pMain.parent.parent) {
           const bounds = this.pMain.parent.parent.getBounds();
           if (bounds && bounds.width && bounds.height) {

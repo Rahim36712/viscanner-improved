@@ -49,6 +49,10 @@ function downloadBlob(blob, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+function cleanSvgMarkup(svgMarkup) {
+  return svgMarkup;
+}
+
 /**
  * Convert HiGlass' SVG export into a PDF without rasterizing the SVG as a whole.
  * SVG paths, labels, axes, and shapes remain PDF vector content. Pixi layers that
@@ -61,7 +65,8 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
     return Promise.reject(new Error("The visualization did not return an SVG export."));
   }
 
-  const { width, height } = getSvgSize(svgMarkup);
+  const cleanedSvg = cleanSvgMarkup(svgMarkup);
+  const { width, height } = getSvgSize(cleanedSvg);
 
   return new Promise((resolve, reject) => {
     // Yield execution to event loop so UI state (e.g. loading spinner) updates before PDF compilation
@@ -87,7 +92,7 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
         stream.on("error", reject);
 
         pdf.addPage({ size: [width, height], margin: 0 });
-        SVGtoPDF(pdf, svgMarkup, 0, 0, {
+        SVGtoPDF(pdf, cleanedSvg, 0, 0, {
           assumePt: false,
           height,
           precision: 6,
