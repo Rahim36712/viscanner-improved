@@ -249,6 +249,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         fill: options.fill || AXIS_COLOR,
         fontWeight: options.fontWeight || "normal",
       });
+      label.resolution = 4;
       label.x = x;
       label.y = y;
       label.anchor.x = options.anchorX === undefined ? 0.5 : options.anchorX;
@@ -291,7 +292,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.axisGraphics.clear();
       this.labelContainer.removeChildren();
 
-      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 1);
+      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 0);
       if (this.hpLaneMode) {
         this.axisGraphics.moveTo(leftAxisX, centerY);
         this.axisGraphics.lineTo(rightAxisX, centerY);

@@ -26,7 +26,8 @@
           "top": [
             {
               "type": "aligned-horizontal-gene-annotations",
-              "height": 60,
+              "height": 95,
+              "defaultHeight": 95,
               "tilesetUid": "OHJakQICQD6gTD7skx4EWA",
               "server": "https://higlass.io/api/v1",
               "chromInfoPath": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",

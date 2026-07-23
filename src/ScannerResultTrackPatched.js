@@ -33,11 +33,8 @@ function drawChromosomeBands(track) {
 }
 
 function drawPlotGrid(track) {
-  const { left, right } = getPlotBounds(track);
-  track.bgGraphics.beginFill(track.HGC.utils.colorToHex("#ebebeb"));
-  track.legendUtils.currentLegendLevels.forEach((yLevel) => {
-    track.bgGraphics.drawRect(left, yLevel, right - left, 1);
-  });
+  // Horizontal grid lines disabled to keep plot background clean
+  return;
 }
 
 function ScannerResultTrackPatched(HGC, ...args) {

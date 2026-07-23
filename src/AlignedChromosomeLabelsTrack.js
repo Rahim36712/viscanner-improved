@@ -2,6 +2,7 @@ import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo } from "smaht-higlass-misc/es/chrom-utils";
 import { scaleLinear } from "d3-scale";
 import { getPlotBounds, mapTrackX, unmapTrackX, PLOT_LEFT } from "./plotBounds";
+import { createHighResBase64Extractor } from "./pdfExport";
 
 const AXIS_COLOR = "#808080";
 const TEXT_STROKE = "#ffffff";
@@ -85,9 +86,8 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
         fontSize: options.fontSize || `${this.options.fontSize || 12}px`,
         fontFamily: "Arial",
         fill: options.fill || this.options.color || AXIS_COLOR,
-        stroke: options.stroke || this.options.stroke || TEXT_STROKE,
-        strokeThickness: 2,
       });
+      label.resolution = 4;
       label.x = x;
       label.y = y;
       label.anchor.x = options.anchorX === undefined ? 0.5 : options.anchorX;
@@ -254,6 +254,42 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
     zoomed(newXScale, newYScale) {
       super.zoomed(newXScale, newYScale);
       this.updateExistingGraphics();
+    }
+
+    exportSVG() {
+      const HGC = this.HGC;
+      const renderer = HGC?.services?.pixiRenderer;
+      const extractor = renderer ? createHighResBase64Extractor(HGC, 6) : null;
+
+      if (extractor) {
+        renderer.plugins.extract.base64 = extractor.highResBase64;
+      }
+
+      let result;
+      try {
+        result = super.exportSVG();
+      } finally {
+        if (extractor) {
+          renderer.plugins.extract.base64 = extractor.originalBase64;
+        }
+      }
+
+      try {
+        if (result && result[0]) {
+          const image = result[0].querySelector("image");
+          if (image && this.pMain && this.pMain.parent && this.pMain.parent.parent) {
+            const bounds = this.pMain.parent.parent.getBounds();
+            if (bounds && bounds.width && bounds.height) {
+              image.setAttribute("width", bounds.width);
+              image.setAttribute("height", bounds.height);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to set SVG image dimensions for chromosome labels track:", err);
+      }
+
+      return result;
     }
   }
 

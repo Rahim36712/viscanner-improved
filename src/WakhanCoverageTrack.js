@@ -530,6 +530,7 @@ function WakhanCoverageTrack(HGC, ...args) {
         fontFamily: "Arial",
         fill: options.fill || AXIS_COLOR,
       });
+      label.resolution = 4;
       label.x = x;
       label.y = y;
       label.anchor.x = options.anchorX === undefined ? 0.5 : options.anchorX;
@@ -547,7 +548,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.axisGraphics.clear();
       this.labelContainer.removeChildren();
 
-      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 1);
+      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 0);
       coverageTicks(this.coverageMax).forEach((tick) => {
         const halves = tick === 0 ? [1] : [1, 2];
         halves.forEach((hp) => {
