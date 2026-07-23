@@ -261,43 +261,35 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
       const renderer = HGC?.services?.pixiRenderer;
       const extractor = renderer ? createHighResBase64Extractor(HGC, 6) : null;
 
-      const gTrack = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      gTrack.setAttribute("class", "aligned-chromosome-labels-track");
-
-      let imgB64 = null;
       if (extractor) {
-        try {
-          imgB64 = extractor.highResBase64(this.pForeground || this.pMain);
-        } catch (e) {
-          console.warn("High-res capture fallback for Chromosome Labels:", e);
+        renderer.plugins.extract.base64 = extractor.highResBase64;
+      }
+
+      let result;
+      try {
+        result = super.exportSVG();
+      } finally {
+        if (extractor) {
+          renderer.plugins.extract.base64 = extractor.originalBase64;
         }
       }
 
-      if (imgB64) {
-        const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
-        image.setAttribute("href", imgB64);
-        image.setAttribute("x", "0");
-        image.setAttribute("y", "0");
-
-        let width = this.dimensions[0];
-        let height = this.dimensions[1];
-
-        if (this.pMain && this.pMain.parent && this.pMain.parent.parent) {
-          try {
+      try {
+        if (result && result[0]) {
+          const image = result[0].querySelector("image");
+          if (image && this.pMain && this.pMain.parent && this.pMain.parent.parent) {
             const bounds = this.pMain.parent.parent.getBounds();
             if (bounds && bounds.width && bounds.height) {
-              width = bounds.width;
-              height = bounds.height;
+              image.setAttribute("width", bounds.width);
+              image.setAttribute("height", bounds.height);
             }
-          } catch (e) {}
+          }
         }
-
-        image.setAttribute("width", String(width));
-        image.setAttribute("height", String(height));
-        gTrack.appendChild(image);
+      } catch (err) {
+        console.warn("Failed to set SVG image dimensions for chromosome labels track:", err);
       }
 
-      return [gTrack, gTrack];
+      return result;
     }
   }
 

@@ -827,118 +827,27 @@ function WakhanCoverageTrack(HGC, ...args) {
     drawCoverageSegments() {
       const hp1Color = this.HGC.utils.colorToHex(HP1_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_COLOR);
-
-      const drawHpSegmentsList = (hpSegments, hp, color) => {
-        if (!hpSegments || hpSegments.length === 0) return;
+      const drawSegment = (segment, hp, color) => {
         const { leftAxisX, rightAxisX } = this.metrics();
-
-        if (this.chromInfo && this.chromInfo.cumPositions) {
-          const cumPositions = this.chromInfo.cumPositions;
-          const chromLengths = this.chromInfo.chromLengths;
-
-          const segmentsByChr = new Map();
-          hpSegments.forEach((segment) => {
-            let matchedIndex = -1;
-            for (let i = 0; i < cumPositions.length; i++) {
-              const start = cumPositions[i].pos;
-              const length = Number(chromLengths[cumPositions[i].chr]) || 0;
-              const end = start + length;
-              if (segment.startAbs >= start && segment.startAbs <= end) {
-                matchedIndex = i;
-                break;
-              }
-            }
-            if (matchedIndex === -1 && cumPositions.length > 0) {
-              for (let i = 0; i < cumPositions.length; i++) {
-                const start = cumPositions[i].pos;
-                if (segment.startAbs < start) {
-                  matchedIndex = Math.max(0, i - 1);
-                  break;
-                }
-                matchedIndex = i;
-              }
-            }
-
-            if (matchedIndex >= 0) {
-              if (!segmentsByChr.has(matchedIndex)) {
-                segmentsByChr.set(matchedIndex, []);
-              }
-              segmentsByChr.get(matchedIndex).push(segment);
-            }
-          });
-
-          segmentsByChr.forEach((chrSegments, chrIdx) => {
-            const cumPos = cumPositions[chrIdx];
-            const chrStart = cumPos.pos;
-            const chrEnd = chrStart + (Number(chromLengths[cumPos.chr]) || 0);
-
-            chrSegments.sort((a, b) => a.startAbs - b.startAbs);
-
-            const n = chrSegments.length;
-            for (let i = 0; i < n; i++) {
-              const segment = chrSegments[i];
-              let effStart = segment.startAbs;
-              let effEnd = segment.endAbs;
-
-              // Snap 1st segment in chromosome to chromosome start
-              if (i === 0) {
-                effStart = chrStart;
-              }
-              // Snap last segment in chromosome to chromosome end
-              if (i === n - 1) {
-                effEnd = chrEnd;
-              }
-              // Snap adjacent segments together to eliminate gaps
-              if (i < n - 1) {
-                const nextSeg = chrSegments[i + 1];
-                if (nextSeg.startAbs > effEnd) {
-                  effEnd = nextSeg.startAbs;
-                }
-              }
-
-              // Strict clamping to chromosome boundaries
-              effStart = Math.max(chrStart, effStart);
-              effEnd = Math.min(chrEnd, effEnd);
-
-              if (effEnd <= effStart) continue;
-
-              const xStart = Math.max(leftAxisX, this.plotX(effStart));
-              const xEnd = Math.min(rightAxisX, this.plotX(effEnd));
-              const width = xEnd - xStart;
-              if (width <= 0) continue;
-
-              const yCopyNumber = this.yCopyNumber(segment.copyNumber, hp);
-              if (yCopyNumber === null) continue;
-
-              const y = yCopyNumber - 2;
-              this.segmentGraphics.beginFill(color, 0.95);
-              this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
-            }
-          });
+        const xStart = Math.max(leftAxisX, this.plotX(segment.startAbs));
+        const xEnd = Math.min(rightAxisX, this.plotX(segment.endAbs));
+        const width = xEnd - xStart;
+        if (width <= 0) {
           return;
         }
-
-        // Fallback
-        hpSegments.forEach((segment) => {
-          const xStart = Math.max(leftAxisX, this.plotX(segment.startAbs));
-          const xEnd = Math.min(rightAxisX, this.plotX(segment.endAbs));
-          const width = xEnd - xStart;
-          if (width <= 0) return;
-
-          const yCopyNumber = this.yCopyNumber(segment.copyNumber, hp);
-          if (yCopyNumber === null) return;
-
-          const y = yCopyNumber - 2;
-          this.segmentGraphics.beginFill(color, 0.95);
-          this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
-        });
+        const yCopyNumber = this.yCopyNumber(segment.copyNumber, hp);
+        if (yCopyNumber === null) {
+          return;
+        }
+        const y = yCopyNumber - 2;
+        this.segmentGraphics.beginFill(color, 0.95);
+        this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
       };
-
       if (this.showHp1) {
-        drawHpSegmentsList(this.currentHp1Segments, 1, hp1Color);
+        this.currentHp1Segments.forEach((segment) => drawSegment(segment, 1, hp1Color));
       }
       if (this.showHp2) {
-        drawHpSegmentsList(this.currentHp2Segments, 2, hp2Color);
+        this.currentHp2Segments.forEach((segment) => drawSegment(segment, 2, hp2Color));
       }
     }
 
