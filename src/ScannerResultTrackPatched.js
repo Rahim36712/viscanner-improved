@@ -119,18 +119,19 @@ function ScannerResultTrackPatched(HGC, ...args) {
     const toX = this._xScale.invert(this.dimensions[0]);
     const refreshStep = this.options.yValue === "baf" ? 0.02 : 0.05;
 
+    const prevSpan = Math.abs(this.previousToX - this.previousFromX);
     if (
-      Math.abs((this.previousFromX - fromX) / (this.previousToX - this.previousFromX)) >
-        refreshStep ||
-      Math.abs((this.previousToX - toX) / (this.previousToX - this.previousFromX)) >
-        refreshStep
+      !Number.isFinite(prevSpan) ||
+      prevSpan === 0 ||
+      Math.abs((this.previousFromX - fromX) / prevSpan) > refreshStep ||
+      Math.abs((this.previousToX - toX) / prevSpan) > refreshStep
     ) {
-      this.currentFilteredList = this.data.filter(
+      this.currentFilteredList = (this.data || []).filter(
         (segment) => segment.toAbs >= fromX - refreshStep && segment.fromAbs <= toX + refreshStep
       );
 
       const snpLimit = this.options.yValue === "baf" ? 6000 : 10000;
-      this.currentFilteredListSnp = this.snpData
+      this.currentFilteredListSnp = (this.snpData || [])
         .filter((segment) => segment.posAbs >= fromX - refreshStep && segment.posAbs <= toX + refreshStep)
         .slice(0, snpLimit);
 
@@ -148,6 +149,13 @@ function ScannerResultTrackPatched(HGC, ...args) {
 
       this.previousFromX = fromX;
       this.previousToX = toX;
+    }
+
+    if (!Array.isArray(this.currentFilteredList)) {
+      this.currentFilteredList = [];
+    }
+    if (!Array.isArray(this.currentFilteredListSnp)) {
+      this.currentFilteredListSnp = [];
     }
 
     this.createLegendGraphics(this.currentMaxValue);

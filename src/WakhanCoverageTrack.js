@@ -420,6 +420,7 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.hp1Segments.concat(this.hp2Segments)
       );
       annotateCoverageRows(this.coverage, this.hp1Segments, this.hp2Segments);
+      this._cachedChromBounds = null;
       this.resetCache();
     }
 
@@ -612,6 +613,59 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
     }
 
+    getChromosomeDataBounds() {
+      if (this._cachedChromBounds) {
+        return this._cachedChromBounds;
+      }
+      if (!this.chromInfo || !this.chromInfo.cumPositions) {
+        return null;
+      }
+
+      const cumPositions = this.chromInfo.cumPositions;
+      const chromLengths = this.chromInfo.chromLengths;
+
+      const chrMaxEnd = new Map();
+      const chrMinStart = new Map();
+
+      const allSegments = (this.hp1Segments || []).concat(this.hp2Segments || []);
+      for (let i = 0; i < allSegments.length; i++) {
+        const seg = allSegments[i];
+        if (!seg.chr) continue;
+        const currentMax = chrMaxEnd.get(seg.chr);
+        if (currentMax === undefined || seg.endAbs > currentMax) {
+          chrMaxEnd.set(seg.chr, seg.endAbs);
+        }
+        const currentMin = chrMinStart.get(seg.chr);
+        if (currentMin === undefined || seg.startAbs < currentMin) {
+          chrMinStart.set(seg.chr, seg.startAbs);
+        }
+      }
+
+      const bounds = [];
+      for (let i = 0; i < cumPositions.length; i++) {
+        const cp = cumPositions[i];
+        const chrName = cp.chr;
+        const officialLen = Number(chromLengths[chrName]) || 0;
+        const officialStart = cp.pos;
+        const officialEnd = officialStart + officialLen;
+
+        const dataStart = chrMinStart.get(chrName);
+        const dataEnd = chrMaxEnd.get(chrName);
+
+        let startPos = dataStart !== undefined ? Math.min(officialStart, dataStart) : officialStart;
+        let endPos = dataEnd !== undefined ? dataEnd : officialEnd;
+
+        if (i > 0) {
+          startPos = bounds[i - 1].end;
+        }
+
+        bounds.push({ chr: chrName, start: startPos, end: endPos });
+      }
+
+      this._cachedChromBounds = bounds;
+      return bounds;
+    }
+
     drawChromosomeBackground() {
       const { top, leftAxisX, rightAxisX, height } = this.metrics();
       if (!this.chromInfo || !this.chromInfo.cumPositions) {
@@ -654,9 +708,13 @@ function WakhanCoverageTrack(HGC, ...args) {
       const fromX = this._xScale.invert(0);
       const toX = this._xScale.invert(this.dimensions[0]);
       const refreshStep = 0.02;
+      const prevSpan = Math.abs(this.previousToX - this.previousFromX);
+
       if (
-        Math.abs((this.previousFromX - fromX) / (this.previousToX - this.previousFromX)) <= refreshStep &&
-        Math.abs((this.previousToX - toX) / (this.previousToX - this.previousFromX)) <= refreshStep
+        Number.isFinite(prevSpan) &&
+        prevSpan > 0 &&
+        Math.abs((this.previousFromX - fromX) / prevSpan) <= refreshStep &&
+        Math.abs((this.previousToX - toX) / prevSpan) <= refreshStep
       ) {
         return;
       }
