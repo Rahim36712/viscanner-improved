@@ -3,6 +3,14 @@ import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
 import { getPlotBounds, mapTrackX } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
+import {
+  isFiniteNumber,
+  isValidVariant,
+  safeMoveTo,
+  safeLineTo,
+  safeDrawRect,
+  logDevSkip,
+} from "./safeRendering";
 
 const TYPE_COLORS = {
   DEL: "#F27A9A",
@@ -43,18 +51,18 @@ function normalizeTrackData(data) {
 }
 
 function variantLength(variant) {
-  if (Number.isFinite(variant.svlen)) {
+  if (isFiniteNumber(variant?.svlen)) {
     return Math.abs(variant.svlen);
   }
-  if (Number.isFinite(variant.startAbs) && Number.isFinite(variant.endAbs)) {
+  if (isFiniteNumber(variant?.startAbs) && isFiniteNumber(variant?.endAbs)) {
     return Math.abs(variant.endAbs - variant.startAbs);
   }
   return 0;
 }
 
 function sampleRows(rows, maxRows) {
-  if (rows.length <= maxRows) {
-    return rows;
+  if (!Array.isArray(rows) || rows.length <= maxRows) {
+    return rows || [];
   }
   const step = Math.ceil(rows.length / maxRows);
   const sampled = [];
@@ -176,13 +184,13 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       }
 
       this.variants = normalizedData.variants
-        .filter((variant) => this.chromInfo.chrPositions[variant.chr])
+        .filter((variant) => variant && this.chromInfo.chrPositions[variant.chr])
         .map((variant) => {
           const startAbs = chrToAbs(variant.chr, variant.pos, this.chromInfo);
           let endAbs = startAbs;
           if (variant.chr2 && this.chromInfo.chrPositions[variant.chr2]) {
             endAbs = chrToAbs(variant.chr2, variant.pos2 || variant.pos, this.chromInfo);
-          } else if (Number.isFinite(variant.pos2)) {
+          } else if (isFiniteNumber(variant.pos2)) {
             endAbs = chrToAbs(variant.chr, variant.pos2, this.chromInfo);
           }
           return {
@@ -191,7 +199,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
             endAbs,
           };
         })
-        .filter((variant) => Number.isFinite(variant.startAbs));
+        .filter((variant) => isFiniteNumber(variant.startAbs) && isFiniteNumber(variant.endAbs));
 
       this.resetCache();
     }
@@ -229,7 +237,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       const top = this.hpLaneMode ? 4 : 0;
       const bottom = this.hpLaneMode ? 4 : 0;
       const { left: leftAxisX, right: rightAxisX } = getPlotBounds(this);
-      const height = Math.max(1, this.dimensions[1] - top - bottom);
+      const rawHeight = (this.dimensions && this.dimensions[1]) ? this.dimensions[1] - top - bottom : 100;
+      const height = Math.max(1, isFiniteNumber(rawHeight) ? rawHeight : 100);
       const baselineY = this.hpFilter === "2" && !this.hpLaneMode
         ? top + 2
         : top + height - 2;
@@ -237,12 +246,19 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       return { top, bottom, leftAxisX, rightAxisX, height, baselineY, centerY };
     }
 
+    /**
+     * Maps an absolute genomic position to track X coordinates.
+     * UNCHANGED per engineering requirement #1.
+     */
     plotX(absPosition) {
       const { leftAxisX, rightAxisX } = this.metrics();
       return mapTrackX(this, absPosition);
     }
 
     addText(text, x, y, options = {}) {
+      if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+        return;
+      }
       const label = new this.HGC.libraries.PIXI.Text(text, {
         fontSize: options.fontSize || "11px",
         fontFamily: "Arial",
@@ -272,18 +288,25 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           return;
         }
         const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
-        if (!Number.isFinite(chrLength)) {
+        if (!isFiniteNumber(chrLength)) {
           return;
         }
 
-        const startX = Math.max(leftAxisX, this.plotX(chromosome.pos));
-        const endX = Math.min(rightAxisX, this.plotX(chromosome.pos + chrLength));
+        const rawStartX = this.plotX(chromosome.pos);
+        const rawEndX = this.plotX(chromosome.pos + chrLength);
+        if (!isFiniteNumber(rawStartX) || !isFiniteNumber(rawEndX)) {
+          return;
+        }
+
+        const startX = Math.max(leftAxisX, rawStartX);
+        const endX = Math.min(rightAxisX, rawEndX);
         if (endX <= leftAxisX || startX >= rightAxisX || endX <= startX) {
           return;
         }
 
         this.bgGraphics.beginFill(bandColor, 0.85);
-        this.bgGraphics.drawRect(startX, top, endX - startX, height);
+        safeDrawRect(this.bgGraphics, startX, top, endX - startX, height, "drawChromosomeBackground");
+        this.bgGraphics.endFill();
       });
     }
 
@@ -294,18 +317,18 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
       this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(GRID_COLOR), 0);
       if (this.hpLaneMode) {
-        this.axisGraphics.moveTo(leftAxisX, centerY);
-        this.axisGraphics.lineTo(rightAxisX, centerY);
+        safeMoveTo(this.axisGraphics, leftAxisX, centerY, "drawAxes:gridMove");
+        safeLineTo(this.axisGraphics, rightAxisX, centerY, "drawAxes:gridLine");
       } else {
-        this.axisGraphics.moveTo(leftAxisX, baselineY);
-        this.axisGraphics.lineTo(rightAxisX, baselineY);
+        safeMoveTo(this.axisGraphics, leftAxisX, baselineY, "drawAxes:gridMove");
+        safeLineTo(this.axisGraphics, rightAxisX, baselineY, "drawAxes:gridLine");
       }
 
       this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 1);
-      this.axisGraphics.moveTo(leftAxisX, top);
-      this.axisGraphics.lineTo(leftAxisX, top + height);
-      this.axisGraphics.moveTo(rightAxisX, top);
-      this.axisGraphics.lineTo(rightAxisX, top + height);
+      safeMoveTo(this.axisGraphics, leftAxisX, top, "drawAxes:leftMove");
+      safeLineTo(this.axisGraphics, leftAxisX, top + height, "drawAxes:leftLine");
+      safeMoveTo(this.axisGraphics, rightAxisX, top, "drawAxes:rightMove");
+      safeLineTo(this.axisGraphics, rightAxisX, top + height, "drawAxes:rightLine");
 
       const axisLabel = this.hpFilter
         ? `HP-${this.hpFilter} breakpoints`
@@ -335,11 +358,21 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     updateVisibleData() {
+      if (!this._xScale || typeof this._xScale.invert !== "function") {
+        return;
+      }
       const fromX = this._xScale.invert(0);
-      const toX = this._xScale.invert(this.dimensions[0]);
-      const span = Math.max(1, this.previousToX - this.previousFromX);
+      const toX = this._xScale.invert(this.dimensions ? this.dimensions[0] : 0);
+
+      if (!isFiniteNumber(fromX) || !isFiniteNumber(toX)) {
+        return;
+      }
+
+      const span = Math.abs(this.previousToX - this.previousFromX);
       const refreshStep = 0.02;
       if (
+        isFiniteNumber(span) &&
+        span > 0 &&
         Math.abs((this.previousFromX - fromX) / span) <= refreshStep &&
         Math.abs((this.previousToX - toX) / span) <= refreshStep
       ) {
@@ -350,6 +383,9 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       const passOnly = this.options.passOnly !== false;
       const endpointPadding = Math.max(5000, Math.abs(toX - fromX) * 0.2);
       this.currentVariants = this.variants.filter((variant) => {
+        if (!isValidVariant(variant)) {
+          return false;
+        }
         if (this.hpFilter && variant.hp !== this.hpFilter) {
           return false;
         }
@@ -377,6 +413,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         ) {
           return false;
         }
+
+        // Viewport culling: skip if completely outside visible genomic range
         return (
           (variant.startAbs >= fromX - endpointPadding && variant.startAbs <= toX + endpointPadding) ||
           (variant.endAbs >= fromX - endpointPadding && variant.endAbs <= toX + endpointPadding)
@@ -387,9 +425,36 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     drawArc(variant, color) {
+      if (!isValidVariant(variant) || !isFiniteNumber(variant.startAbs) || !isFiniteNumber(variant.endAbs)) {
+        logDevSkip(variant, "Invalid variant coordinates in drawArc");
+        return;
+      }
+
       const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
-      const x1 = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
-      const x2 = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.endAbs)));
+
+      // Immediately validate plotX returned values
+      const rawX1 = this.plotX(variant.startAbs);
+      if (!isFiniteNumber(rawX1)) {
+        logDevSkip(variant, "plotX(startAbs) returned non-finite value", { rawX1 });
+        return;
+      }
+      const x1 = Math.max(leftAxisX, Math.min(rightAxisX, rawX1));
+      if (!isFiniteNumber(x1)) {
+        logDevSkip(variant, "Bounded x1 is non-finite", { x1, rawX1, leftAxisX, rightAxisX });
+        return;
+      }
+
+      const rawX2 = this.plotX(variant.endAbs);
+      if (!isFiniteNumber(rawX2)) {
+        logDevSkip(variant, "plotX(endAbs) returned non-finite value", { rawX2 });
+        return;
+      }
+      const x2 = Math.max(leftAxisX, Math.min(rightAxisX, rawX2));
+      if (!isFiniteNumber(x2)) {
+        logDevSkip(variant, "Bounded x2 is non-finite", { x2, rawX2, leftAxisX, rightAxisX });
+        return;
+      }
+
       if (Math.abs(x2 - x1) < 1) {
         return this.drawMarker(variant, color);
       }
@@ -400,6 +465,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       let endY = baselineY;
       let apexY;
       const multiplier = this.options.arcHeightMultiplier !== undefined ? Number(this.options.arcHeightMultiplier) : 1.0;
+
       if (this.hpLaneMode) {
         const laneHeight = Math.max(18, height / 2 - 6);
         const laneLift = (8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6)) * multiplier;
@@ -424,19 +490,36 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           apexY = 2 * targetY - baselineY;
         }
       }
-      const controlX = (x1 + x2) / 2;
-      const steps = span > 280 ? 30 : 22;
 
+      // Immediately validate controlX and apexY
+      const controlX = (x1 + x2) / 2;
+      if (!isFiniteNumber(controlX)) {
+        logDevSkip(variant, "controlX calculation produced non-finite value", { x1, x2, controlX });
+        return;
+      }
+      if (!isFiniteNumber(apexY) || !isFiniteNumber(startY) || !isFiniteNumber(endY)) {
+        logDevSkip(variant, "Y positions produced non-finite values", { startY, endY, apexY });
+        return;
+      }
+
+      const steps = span > 280 ? 30 : 22;
       this.variantGraphics.lineStyle(1.25, color, ARC_ALPHA);
+
       for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
         const inverse = 1 - t;
         const x = inverse * inverse * x1 + 2 * inverse * t * controlX + t * t * x2;
         const y = inverse * inverse * startY + 2 * inverse * t * apexY + t * t * endY;
+
+        if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+          logDevSkip(variant, "Bezier point coordinate is non-finite", { i, t, x, y, x1, x2, controlX, startY, endY, apexY });
+          return;
+        }
+
         if (i === 0) {
-          this.variantGraphics.moveTo(x, y);
+          safeMoveTo(this.variantGraphics, x, y, "drawArc:moveTo");
         } else {
-          this.variantGraphics.lineTo(x, y);
+          safeLineTo(this.variantGraphics, x, y, "drawArc:lineTo");
         }
       }
 
@@ -452,16 +535,39 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     drawMarker(variant, color) {
+      if (!isValidVariant(variant) || !isFiniteNumber(variant.startAbs)) {
+        logDevSkip(variant, "Invalid variant coordinates in drawMarker");
+        return;
+      }
+
       const { top, leftAxisX, rightAxisX, height, baselineY, centerY } = this.metrics();
-      const x = Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.startAbs)));
-      const x2 = Number.isFinite(variant.endAbs)
-        ? Math.max(leftAxisX, Math.min(rightAxisX, this.plotX(variant.endAbs)))
-        : x;
+
+      // Immediately validate plotX returned values
+      const rawX = this.plotX(variant.startAbs);
+      if (!isFiniteNumber(rawX)) {
+        logDevSkip(variant, "plotX(startAbs) returned non-finite value", { rawX });
+        return;
+      }
+      const x = Math.max(leftAxisX, Math.min(rightAxisX, rawX));
+      if (!isFiniteNumber(x)) {
+        logDevSkip(variant, "Bounded x is non-finite", { x, rawX });
+        return;
+      }
+
+      let x2 = x;
+      if (isFiniteNumber(variant.endAbs)) {
+        const rawX2 = this.plotX(variant.endAbs);
+        if (isFiniteNumber(rawX2)) {
+          x2 = Math.max(leftAxisX, Math.min(rightAxisX, rawX2));
+        }
+      }
+
       const span = Math.abs(x2 - x);
       const plotWidth = Math.max(1, rightAxisX - leftAxisX);
       let markerTop = baselineY;
       let markerBottom = baselineY;
       const multiplier = this.options.arcHeightMultiplier !== undefined ? Number(this.options.arcHeightMultiplier) : 1.0;
+
       if (this.hpFilter === "2" && !this.hpLaneMode) {
         markerTop = baselineY;
         const arcLift = (10 + Math.sqrt(Math.min(1, span / plotWidth)) * (height - 14)) * multiplier;
@@ -471,6 +577,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         markerTop = Math.max(top + 2, baselineY - Math.min(height - 4, arcLift));
         markerBottom = baselineY;
       }
+
       if (this.hpLaneMode) {
         const laneHeight = Math.max(18, height / 2 - 6);
         const laneLift = (8 + Math.sqrt(Math.min(1, span / plotWidth)) * (laneHeight - 6)) * multiplier;
@@ -482,9 +589,17 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           markerBottom = Math.min(top + height - 2, markerTop + laneLift);
         }
       }
+
+      // Immediately validate vertical bounds
+      if (!isFiniteNumber(markerTop) || !isFiniteNumber(markerBottom)) {
+        logDevSkip(variant, "markerTop or markerBottom calculation produced non-finite value", { markerTop, markerBottom });
+        return;
+      }
+
       this.variantGraphics.lineStyle(1, color, MARKER_ALPHA);
-      this.variantGraphics.moveTo(x, markerTop);
-      this.variantGraphics.lineTo(x, markerBottom);
+      safeMoveTo(this.variantGraphics, x, markerTop, "drawMarker:moveTo");
+      safeLineTo(this.variantGraphics, x, markerBottom, "drawMarker:lineTo");
+
       this.hitRegions.push({
         variant,
         kind: "marker",
@@ -508,14 +623,24 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         (variant) => !(variant.type === "INS" || variant.type === "sBND" || variant.startAbs === variant.endAbs)
       );
 
+      // PER-VARIANT ERROR ISOLATION for markers
       markerVariants.forEach((variant) => {
-        const color = this.HGC.utils.colorToHex(TYPE_COLORS[variant.type] || TYPE_COLORS.BND);
-        this.drawMarker(variant, color);
+        try {
+          const color = this.HGC.utils.colorToHex(TYPE_COLORS[variant.type] || TYPE_COLORS.BND);
+          this.drawMarker(variant, color);
+        } catch (err) {
+          logDevSkip(variant, "Runtime exception in drawMarker caught safely", { error: err?.message });
+        }
       });
 
+      // PER-VARIANT ERROR ISOLATION for arcs
       arcVariants.forEach((variant) => {
-        const color = this.HGC.utils.colorToHex(TYPE_COLORS[variant.type] || TYPE_COLORS.BND);
-        this.drawArc(variant, color);
+        try {
+          const color = this.HGC.utils.colorToHex(TYPE_COLORS[variant.type] || TYPE_COLORS.BND);
+          this.drawArc(variant, color);
+        } catch (err) {
+          logDevSkip(variant, "Runtime exception in drawArc caught safely", { error: err?.message });
+        }
       });
     }
 
@@ -535,38 +660,69 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         return;
       }
 
-      this.updateVisibleData();
-      this.drawChromosomeBackground();
-      this.drawAxes();
-      this.drawStructuralVariants();
+      // Sub-step rendering isolation
+      try {
+        this.updateVisibleData();
+      } catch (err) {
+        logDevSkip(null, "Error updating visible data", { error: err?.message });
+      }
+
+      try {
+        this.drawChromosomeBackground();
+      } catch (err) {
+        logDevSkip(null, "Error drawing chromosome background", { error: err?.message });
+      }
+
+      try {
+        this.drawAxes();
+      } catch (err) {
+        logDevSkip(null, "Error drawing axes", { error: err?.message });
+      }
+
+      try {
+        this.drawStructuralVariants();
+      } catch (err) {
+        logDevSkip(null, "Error drawing structural variants", { error: err?.message });
+      }
     }
 
     getMouseOverHtml(trackX, trackY) {
+      if (!isFiniteNumber(trackX) || !isFiniteNumber(trackY)) {
+        return "";
+      }
+
       const hits = this.hitRegions
         .map((region) => {
-        if (region.kind === "marker") {
-          if (Math.abs(trackX - region.x) <= 6 && trackY >= region.top && trackY <= region.bottom + 4) {
-            return {
-              region,
-              distance: Math.abs(trackX - region.x),
-            };
+          if (region.kind === "marker") {
+            if (Math.abs(trackX - region.x) <= 6 && trackY >= region.top && trackY <= region.bottom + 4) {
+              return {
+                region,
+                distance: Math.abs(trackX - region.x),
+              };
+            }
+            return null;
           }
-          return null;
-        }
-        const minX = Math.min(region.x1, region.x2) - 4;
-        const maxX = Math.max(region.x1, region.x2) + 4;
-        if (trackX < minX || trackX > maxX) {
-          return null;
-        }
-        const t = Math.max(0, Math.min(1, (trackX - region.x1) / (region.x2 - region.x1)));
-        const inverse = 1 - t;
-        const y =
-          inverse * inverse * region.baselineY +
-          2 * inverse * t * region.apexY +
-          t * t * region.baselineY;
-        const distance = Math.abs(trackY - y);
-        return distance <= 8 ? { region, distance } : null;
-      })
+          const minX = Math.min(region.x1, region.x2) - 4;
+          const maxX = Math.max(region.x1, region.x2) + 4;
+          if (trackX < minX || trackX > maxX) {
+            return null;
+          }
+          const spanX = region.x2 - region.x1;
+          if (spanX === 0) {
+            return null;
+          }
+          const t = Math.max(0, Math.min(1, (trackX - region.x1) / spanX));
+          const inverse = 1 - t;
+          const y =
+            inverse * inverse * region.baselineY +
+            2 * inverse * t * region.apexY +
+            t * t * region.baselineY;
+          if (!isFiniteNumber(y)) {
+            return null;
+          }
+          const distance = Math.abs(trackY - y);
+          return distance <= 8 ? { region, distance } : null;
+        })
         .filter(Boolean)
         .sort((a, b) => a.distance - b.distance);
 

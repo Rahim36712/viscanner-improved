@@ -1,8 +1,22 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
-import { getPlotBounds, mapTrackX, unmapTrackX } from "./plotBounds";
+import {
+  getPlotBounds,
+  mapTrackX,
+  unmapTrackX,
+  registerGlobalChromExtents,
+  getGlobalMasterChromBounds,
+} from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
+import {
+  isFiniteNumber,
+  isValidVariant,
+  safeMoveTo,
+  safeLineTo,
+  safeDrawRect,
+  logDevSkip,
+} from "./safeRendering";
 
 const HP1_COLOR = "#B23A48";
 const HP1_POINT_COLOR = "#D95F65";
@@ -38,15 +52,22 @@ const SV_TYPE_COLORS = {
 };
 
 function clampCoverage(value, coverageMax) {
-  if (!Number.isFinite(value)) {
+  if (!isFiniteNumber(value) || !isFiniteNumber(coverageMax) || coverageMax <= 0) {
     return 0;
   }
   return Math.max(0, Math.min(value, coverageMax));
 }
 
+function clampCopyNumber(value, copyNumberMax) {
+  if (!isFiniteNumber(value) || !isFiniteNumber(copyNumberMax) || copyNumberMax <= 0) {
+    return null;
+  }
+  return Math.max(0, Math.min(value, copyNumberMax));
+}
+
 function sampleRows(rows, maxRows) {
-  if (rows.length <= maxRows) {
-    return rows;
+  if (!Array.isArray(rows) || rows.length <= maxRows) {
+    return rows || [];
   }
   const step = Math.ceil(rows.length / maxRows);
   const sampled = [];
@@ -67,10 +88,10 @@ function normalizeSvData(data) {
 }
 
 function variantLength(variant) {
-  if (Number.isFinite(variant.svlen)) {
+  if (isFiniteNumber(variant?.svlen)) {
     return Math.abs(variant.svlen);
   }
-  if (Number.isFinite(variant.startAbs) && Number.isFinite(variant.endAbs)) {
+  if (isFiniteNumber(variant?.startAbs) && isFiniteNumber(variant?.endAbs)) {
     return Math.abs(variant.endAbs - variant.startAbs);
   }
   return 0;
@@ -84,16 +105,9 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-function clampCopyNumber(value, copyNumberMax) {
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-  return Math.max(0, Math.min(value, copyNumberMax));
-}
-
 function nextMultiple(value, step) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return step;
+  if (!isFiniteNumber(value) || value <= 0 || !isFiniteNumber(step) || step <= 0) {
+    return isFiniteNumber(step) && step > 0 ? step : 30;
   }
   return Math.ceil(value / step) * step;
 }
@@ -101,9 +115,9 @@ function nextMultiple(value, step) {
 function copyNumberEquivalent(rawCoverage, segment) {
   if (
     !segment ||
-    !Number.isFinite(rawCoverage) ||
-    !Number.isFinite(segment.coverage) ||
-    !Number.isFinite(segment.copyNumber) ||
+    !isFiniteNumber(rawCoverage) ||
+    !isFiniteNumber(segment.coverage) ||
+    !isFiniteNumber(segment.copyNumber) ||
     segment.coverage <= 0
   ) {
     return null;
@@ -112,18 +126,25 @@ function copyNumberEquivalent(rawCoverage, segment) {
 }
 
 function maxCoverageFromSegments(segments, fallback) {
+  if (!Array.isArray(segments)) {
+    return isFiniteNumber(fallback) ? fallback : 180;
+  }
   const maxCoverage = segments.reduce((maxValue, segment) => {
-    if (!Number.isFinite(segment.coverage)) {
+    if (!segment || !isFiniteNumber(segment.coverage)) {
       return maxValue;
     }
     return Math.max(maxValue, segment.coverage);
   }, 0);
-  return Math.max(fallback, nextMultiple(maxCoverage, COVERAGE_TICK_STEP));
+  const fallbackVal = isFiniteNumber(fallback) ? fallback : 180;
+  return Math.max(fallbackVal, nextMultiple(maxCoverage, COVERAGE_TICK_STEP));
 }
 
 function maxCopyNumberFromSegments(segments) {
+  if (!Array.isArray(segments)) {
+    return 4;
+  }
   const maxCopyNumber = segments.reduce((maxValue, segment) => {
-    if (!Number.isFinite(segment.copyNumber)) {
+    if (!segment || !isFiniteNumber(segment.copyNumber)) {
       return maxValue;
     }
     return Math.max(maxValue, segment.copyNumber);
@@ -133,21 +154,32 @@ function maxCopyNumberFromSegments(segments) {
 
 function groupSegmentsByChr(segments) {
   const grouped = {};
+  if (!Array.isArray(segments)) {
+    return grouped;
+  }
   segments.forEach((segment) => {
-    if (!grouped[segment.chr]) {
-      grouped[segment.chr] = [];
+    if (segment && segment.chr) {
+      if (!grouped[segment.chr]) {
+        grouped[segment.chr] = [];
+      }
+      grouped[segment.chr].push(segment);
     }
-    grouped[segment.chr].push(segment);
   });
   Object.keys(grouped).forEach((chr) => {
-    grouped[chr].sort((a, b) => a.startAbs - b.startAbs);
+    grouped[chr].sort((a, b) => (a.startAbs || 0) - (b.startAbs || 0));
   });
   return grouped;
 }
 
 function segmentForRow(row, segmentsByChr, pointersByChr) {
+  if (!row || !row.chr || !segmentsByChr) {
+    return null;
+  }
   const rows = segmentsByChr[row.chr];
   if (!rows || !rows.length) {
+    return null;
+  }
+  if (!isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) {
     return null;
   }
   const midpoint = (row.startAbs + row.endAbs) / 2;
@@ -165,6 +197,9 @@ function segmentForRow(row, segmentsByChr, pointersByChr) {
 
 function integerTicks(maxValue) {
   const ticks = [];
+  if (!isFiniteNumber(maxValue) || maxValue < 0) {
+    return ticks;
+  }
   for (let tick = 0; tick <= maxValue; tick += 1) {
     ticks.push(tick);
   }
@@ -173,6 +208,9 @@ function integerTicks(maxValue) {
 
 function coverageTicks(maxValue) {
   const ticks = [];
+  if (!isFiniteNumber(maxValue) || maxValue <= 0) {
+    return [0, COVERAGE_TICK_STEP];
+  }
   for (let tick = 0; tick <= maxValue; tick += COVERAGE_TICK_STEP) {
     ticks.push(tick);
   }
@@ -183,12 +221,16 @@ function coverageTicks(maxValue) {
 }
 
 function annotateCoverageRows(coverageRows, hp1Segments, hp2Segments) {
+  if (!Array.isArray(coverageRows)) {
+    return;
+  }
   const hp1ByChr = groupSegmentsByChr(hp1Segments);
   const hp2ByChr = groupSegmentsByChr(hp2Segments);
   const hp1Pointers = {};
   const hp2Pointers = {};
 
   coverageRows.forEach((row) => {
+    if (!row) return;
     const hp1Segment = segmentForRow(row, hp1ByChr, hp1Pointers);
     const hp2Segment = segmentForRow(row, hp2ByChr, hp2Pointers);
     row.hp1Segment = hp1Segment;
@@ -199,7 +241,7 @@ function annotateCoverageRows(coverageRows, hp1Segments, hp2Segments) {
 }
 
 function formatCopyNumber(value) {
-  if (!Number.isFinite(value)) {
+  if (!isFiniteNumber(value)) {
     return "-";
   }
   if (Number.isInteger(value)) {
@@ -209,7 +251,7 @@ function formatCopyNumber(value) {
 }
 
 function formatCoverage(value) {
-  if (!Number.isFinite(value)) {
+  if (!isFiniteNumber(value)) {
     return "-";
   }
   return format(".2f")(value);
@@ -373,45 +415,60 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
 
       (data.coverage || []).forEach((row) => {
-        if (!this.chromInfo.chrPositions[row.chr]) {
+        if (!row || !this.chromInfo.chrPositions[row.chr]) {
           return;
         }
-        this.coverage.push({
-          chr: row.chr,
-          start: row.start,
-          end: row.end,
-          hp1: row.hp1,
-          hp2: row.hp2,
-          startAbs: chrToAbs(row.chr, row.start, this.chromInfo),
-          endAbs: chrToAbs(row.chr, row.end, this.chromInfo),
-        });
+        const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
+        const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+        if (isFiniteNumber(startAbs) && isFiniteNumber(endAbs)) {
+          this.coverage.push({
+            chr: row.chr,
+            start: row.start,
+            end: row.end,
+            hp1: row.hp1,
+            hp2: row.hp2,
+            startAbs,
+            endAbs,
+          });
+        }
       });
 
       const parseSegments = (rows, key) =>
         (rows || [])
-          .filter((row) => this.chromInfo.chrPositions[row.chr])
-          .map((row) => ({
-            chr: row.chr,
-            start: row.start,
-            end: row.end,
-            coverage: row.coverage,
-            copyNumber: row[key],
-            confidence: row.confidence,
-            startAbs: chrToAbs(row.chr, row.start, this.chromInfo),
-            endAbs: chrToAbs(row.chr, row.end, this.chromInfo),
-          }));
+          .filter((row) => row && this.chromInfo.chrPositions[row.chr])
+          .map((row) => {
+            const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
+            const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+            return {
+              chr: row.chr,
+              start: row.start,
+              end: row.end,
+              coverage: row.coverage,
+              copyNumber: row[key],
+              confidence: row.confidence,
+              startAbs,
+              endAbs,
+            };
+          })
+          .filter((row) => isFiniteNumber(row.startAbs) && isFiniteNumber(row.endAbs));
 
       this.hp1Segments = parseSegments(data.hp1Segments, "hp1");
       this.hp2Segments = parseSegments(data.hp2Segments, "hp2");
       this.maskedRegions = (data.maskedRegions || [])
-        .filter((row) => this.chromInfo.chrPositions[row.chr])
-        .map((row) => ({
-          chr: row.chr,
-          start: row.start,
-          end: row.end,
-          startAbs: chrToAbs(row.chr, row.start, this.chromInfo),
-          endAbs: chrToAbs(row.chr, row.end, this.chromInfo),
-        }));
+        .filter((row) => row && this.chromInfo.chrPositions[row.chr])
+        .map((row) => {
+          const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
+          const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+          return {
+            chr: row.chr,
+            start: row.start,
+            end: row.end,
+            startAbs,
+            endAbs,
+          };
+        })
+        .filter((row) => isFiniteNumber(row.startAbs) && isFiniteNumber(row.endAbs));
+
       this.coverageMax = maxCoverageFromSegments(
         this.hp1Segments.concat(this.hp2Segments),
         this.options.coverageMax || 180
@@ -420,7 +477,17 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.hp1Segments.concat(this.hp2Segments)
       );
       annotateCoverageRows(this.coverage, this.hp1Segments, this.hp2Segments);
-      this._cachedChromBounds = null;
+
+      const allSegs = (this.hp1Segments || []).concat(this.hp2Segments || []);
+      for (let i = 0; i < allSegs.length; i++) {
+        const seg = allSegs[i];
+        if (seg?.chr) registerGlobalChromExtents(seg.chr, seg.startAbs, seg.endAbs);
+      }
+      for (let i = 0; i < (this.coverage || []).length; i++) {
+        const cov = this.coverage[i];
+        if (cov?.chr) registerGlobalChromExtents(cov.chr, cov.startAbs, cov.endAbs);
+      }
+
       this.resetCache();
     }
 
@@ -434,17 +501,17 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
 
       this.svVariants = normalizedData.variants
-        .filter((variant) => this.chromInfo.chrPositions[variant.chr])
+        .filter((variant) => variant && this.chromInfo.chrPositions[variant.chr])
         .map((variant) => {
-          const startAbs = Number.isFinite(variant.startAbs)
+          const startAbs = isFiniteNumber(variant.startAbs)
             ? variant.startAbs
             : chrToAbs(variant.chr, variant.pos, this.chromInfo);
           let endAbs = startAbs;
-          if (Number.isFinite(variant.endAbs)) {
+          if (isFiniteNumber(variant.endAbs)) {
             endAbs = variant.endAbs;
           } else if (variant.chr2 && this.chromInfo.chrPositions[variant.chr2]) {
             endAbs = chrToAbs(variant.chr2, variant.pos2 || variant.pos, this.chromInfo);
-          } else if (Number.isFinite(variant.pos2)) {
+          } else if (isFiniteNumber(variant.pos2)) {
             endAbs = chrToAbs(variant.chr, variant.pos2, this.chromInfo);
           }
           return {
@@ -453,7 +520,7 @@ function WakhanCoverageTrack(HGC, ...args) {
             endAbs,
           };
         })
-        .filter((variant) => Number.isFinite(variant.startAbs));
+        .filter((variant) => isFiniteNumber(variant.startAbs) && isFiniteNumber(variant.endAbs));
     }
 
     rerender(options) {
@@ -493,7 +560,8 @@ function WakhanCoverageTrack(HGC, ...args) {
       const top = 0;
       const bottom = 0;
       const { left: leftAxisX, right: rightAxisX } = getPlotBounds(this);
-      const height = Math.max(1, this.dimensions[1] - top - bottom);
+      const rawHeight = (this.dimensions && this.dimensions[1]) ? this.dimensions[1] - top - bottom : 100;
+      const height = Math.max(1, isFiniteNumber(rawHeight) ? rawHeight : 100);
       const centerY = top + height / 2;
       const halfHeight = height / 2 - 1;
       return { top, bottom, leftAxisX, rightAxisX, height, centerY, halfHeight };
@@ -501,20 +569,42 @@ function WakhanCoverageTrack(HGC, ...args) {
 
     yCoverage(value, hp) {
       const { centerY, halfHeight } = this.metrics();
-      const scaled = (clampCoverage(value, this.coverageMax) / this.coverageMax) * halfHeight;
-      return hp === 1 ? centerY - scaled : centerY + scaled;
+      if (!isFiniteNumber(this.coverageMax) || this.coverageMax <= 0 || !isFiniteNumber(halfHeight)) {
+        return null;
+      }
+      const clampedVal = clampCoverage(value, this.coverageMax);
+      if (!isFiniteNumber(clampedVal)) {
+        return null;
+      }
+      const scaled = (clampedVal / this.coverageMax) * halfHeight;
+      if (!isFiniteNumber(scaled)) {
+        return null;
+      }
+      const y = hp === 1 ? centerY - scaled : centerY + scaled;
+      return isFiniteNumber(y) ? y : null;
     }
 
     yCopyNumber(value, hp) {
       const clampedValue = clampCopyNumber(value, this.copyNumberMax);
-      if (clampedValue === null) {
+      if (clampedValue === null || !isFiniteNumber(clampedValue)) {
         return null;
       }
       const { centerY, halfHeight } = this.metrics();
+      if (!isFiniteNumber(this.copyNumberMax) || this.copyNumberMax <= 0 || !isFiniteNumber(halfHeight)) {
+        return null;
+      }
       const scaled = (clampedValue / this.copyNumberMax) * halfHeight;
-      return hp === 1 ? centerY - scaled : centerY + scaled;
+      if (!isFiniteNumber(scaled)) {
+        return null;
+      }
+      const y = hp === 1 ? centerY - scaled : centerY + scaled;
+      return isFiniteNumber(y) ? y : null;
     }
 
+    /**
+     * Maps an absolute genomic position to track X coordinates.
+     * UNCHANGED per engineering requirement #1.
+     */
     plotX(absPosition) {
       const { leftAxisX, rightAxisX } = this.metrics();
       return mapTrackX(this, absPosition);
@@ -526,6 +616,9 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     addText(text, x, y, options = {}) {
+      if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+        return;
+      }
       const label = new this.HGC.libraries.PIXI.Text(text, {
         fontSize: options.fontSize || "11px",
         fontFamily: "Arial",
@@ -543,9 +636,9 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     drawAxes() {
-      const { top, leftAxisX, rightAxisX, centerY, halfHeight } = this.metrics();
-      const bottomY = top + this.metrics().height;
-      const width = this.dimensions[0];
+      const { top, leftAxisX, rightAxisX, centerY, height } = this.metrics();
+      const bottomY = top + height;
+      const width = (this.dimensions && this.dimensions[0]) ? this.dimensions[0] : 800;
       this.axisGraphics.clear();
       this.labelContainer.removeChildren();
 
@@ -554,21 +647,23 @@ function WakhanCoverageTrack(HGC, ...args) {
         const halves = tick === 0 ? [1] : [1, 2];
         halves.forEach((hp) => {
           const y = tick === 0 ? centerY : this.yCoverage(tick, hp);
-          this.axisGraphics.moveTo(leftAxisX, y);
-          this.axisGraphics.lineTo(rightAxisX, y);
-          this.addText(String(tick), leftAxisX - 8, y, { anchorX: 1 });
+          if (isFiniteNumber(y)) {
+            safeMoveTo(this.axisGraphics, leftAxisX, y, "drawAxes:tickMove");
+            safeLineTo(this.axisGraphics, rightAxisX, y, "drawAxes:tickLine");
+            this.addText(String(tick), leftAxisX - 8, y, { anchorX: 1 });
+          }
         });
       });
 
       this.axisGraphics.lineStyle(2, this.HGC.utils.colorToHex(CENTER_COLOR), 1);
-      this.axisGraphics.moveTo(leftAxisX, centerY);
-      this.axisGraphics.lineTo(rightAxisX, centerY);
+      safeMoveTo(this.axisGraphics, leftAxisX, centerY, "drawAxes:centerMove");
+      safeLineTo(this.axisGraphics, rightAxisX, centerY, "drawAxes:centerLine");
 
       this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 1);
-      this.axisGraphics.moveTo(leftAxisX, top);
-      this.axisGraphics.lineTo(leftAxisX, bottomY);
-      this.axisGraphics.moveTo(rightAxisX, top);
-      this.axisGraphics.lineTo(rightAxisX, bottomY);
+      safeMoveTo(this.axisGraphics, leftAxisX, top, "drawAxes:leftMove");
+      safeLineTo(this.axisGraphics, leftAxisX, bottomY, "drawAxes:leftLine");
+      safeMoveTo(this.axisGraphics, rightAxisX, top, "drawAxes:rightMove");
+      safeLineTo(this.axisGraphics, rightAxisX, bottomY, "drawAxes:rightLine");
 
       this.addText("Coverage depth", 20, centerY, {
         rotation: -Math.PI / 2,
@@ -596,12 +691,12 @@ function WakhanCoverageTrack(HGC, ...args) {
       const drawCopyTicks = (hp) => {
         integerTicks(this.copyNumberMax).forEach((tick) => {
           const y = this.yCopyNumber(tick, hp);
-          if (y === null) {
+          if (y === null || !isFiniteNumber(y)) {
             return;
           }
           this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 1);
-          this.axisGraphics.moveTo(rightAxisX - 4, y);
-          this.axisGraphics.lineTo(rightAxisX + 4, y);
+          safeMoveTo(this.axisGraphics, rightAxisX - 4, y, "drawCopyTicks:move");
+          safeLineTo(this.axisGraphics, rightAxisX + 4, y, "drawCopyTicks:line");
           this.addText(String(tick), rightAxisX + 10, y, { anchorX: 0 });
         });
       };
@@ -613,66 +708,13 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
     }
 
-    getChromosomeDataBounds() {
-      if (this._cachedChromBounds) {
-        return this._cachedChromBounds;
-      }
-      if (!this.chromInfo || !this.chromInfo.cumPositions) {
-        return null;
-      }
-
-      const cumPositions = this.chromInfo.cumPositions;
-      const chromLengths = this.chromInfo.chromLengths;
-
-      const chrMaxEnd = new Map();
-      const chrMinStart = new Map();
-
-      const allSegments = (this.hp1Segments || []).concat(this.hp2Segments || []);
-      for (let i = 0; i < allSegments.length; i++) {
-        const seg = allSegments[i];
-        if (!seg.chr) continue;
-        const currentMax = chrMaxEnd.get(seg.chr);
-        if (currentMax === undefined || seg.endAbs > currentMax) {
-          chrMaxEnd.set(seg.chr, seg.endAbs);
-        }
-        const currentMin = chrMinStart.get(seg.chr);
-        if (currentMin === undefined || seg.startAbs < currentMin) {
-          chrMinStart.set(seg.chr, seg.startAbs);
-        }
-      }
-
-      const bounds = [];
-      for (let i = 0; i < cumPositions.length; i++) {
-        const cp = cumPositions[i];
-        const chrName = cp.chr;
-        const officialLen = Number(chromLengths[chrName]) || 0;
-        const officialStart = cp.pos;
-        const officialEnd = officialStart + officialLen;
-
-        const dataStart = chrMinStart.get(chrName);
-        const dataEnd = chrMaxEnd.get(chrName);
-
-        let startPos = dataStart !== undefined ? Math.min(officialStart, dataStart) : officialStart;
-        let endPos = dataEnd !== undefined ? dataEnd : officialEnd;
-
-        if (i > 0) {
-          startPos = bounds[i - 1].end;
-        }
-
-        bounds.push({ chr: chrName, start: startPos, end: endPos });
-      }
-
-      this._cachedChromBounds = bounds;
-      return bounds;
-    }
-
     drawChromosomeBackground() {
       const { top, leftAxisX, rightAxisX, height } = this.metrics();
       if (!this.chromInfo || !this.chromInfo.cumPositions) {
         return;
       }
 
-      const bounds = this.getChromosomeDataBounds();
+      const bounds = getGlobalMasterChromBounds(this.chromInfo);
       const bandColor = this.HGC.utils.colorToHex(CHROM_BAND_COLOR);
 
       this.chromInfo.cumPositions.forEach((chromosome, index) => {
@@ -686,32 +728,51 @@ function WakhanCoverageTrack(HGC, ...args) {
           endPos = bounds[index].end;
         } else {
           const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
-          if (!Number.isFinite(chrLength)) {
+          if (!isFiniteNumber(chrLength)) {
             return;
           }
           startPos = chromosome.pos;
           endPos = chromosome.pos + chrLength;
         }
 
-        const startX = Math.max(leftAxisX, this.plotX(startPos));
-        const endX = Math.min(rightAxisX, this.plotX(endPos));
+        if (!isFiniteNumber(startPos) || !isFiniteNumber(endPos)) {
+          return;
+        }
+
+        const rawStartX = this.plotX(startPos);
+        const rawEndX = this.plotX(endPos);
+        if (!isFiniteNumber(rawStartX) || !isFiniteNumber(rawEndX)) {
+          return;
+        }
+
+        const startX = Math.max(leftAxisX, rawStartX);
+        const endX = Math.min(rightAxisX, rawEndX);
         if (endX <= leftAxisX || startX >= rightAxisX || endX <= startX) {
           return;
         }
 
         this.bgGraphics.beginFill(bandColor, 0.85);
-        this.bgGraphics.drawRect(startX, top, endX - startX, height);
+        safeDrawRect(this.bgGraphics, startX, top, endX - startX, height, "drawChromosomeBackground");
+        this.bgGraphics.endFill();
       });
     }
 
     updateVisibleData() {
+      if (!this._xScale || typeof this._xScale.invert !== "function") {
+        return;
+      }
       const fromX = this._xScale.invert(0);
-      const toX = this._xScale.invert(this.dimensions[0]);
+      const toX = this._xScale.invert(this.dimensions ? this.dimensions[0] : 0);
+
+      if (!isFiniteNumber(fromX) || !isFiniteNumber(toX)) {
+        return;
+      }
+
       const refreshStep = 0.02;
       const prevSpan = Math.abs(this.previousToX - this.previousFromX);
 
       if (
-        Number.isFinite(prevSpan) &&
+        isFiniteNumber(prevSpan) &&
         prevSpan > 0 &&
         Math.abs((this.previousFromX - fromX) / prevSpan) <= refreshStep &&
         Math.abs((this.previousToX - toX) / prevSpan) <= refreshStep
@@ -719,23 +780,28 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
-      this.currentCoverage = this.coverage.filter(
-        (row) => row.endAbs >= fromX && row.startAbs <= toX
+      this.currentCoverage = (this.coverage || []).filter(
+        (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
       );
-      this.currentHp1Segments = this.hp1Segments.filter(
-        (row) => row.endAbs >= fromX && row.startAbs <= toX
+      this.currentHp1Segments = (this.hp1Segments || []).filter(
+        (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
       );
-      this.currentHp2Segments = this.hp2Segments.filter(
-        (row) => row.endAbs >= fromX && row.startAbs <= toX
+      this.currentHp2Segments = (this.hp2Segments || []).filter(
+        (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
       );
-      this.currentMaskedRegions = this.maskedRegions.filter(
-        (row) => row.endAbs >= fromX && row.startAbs <= toX
+      this.currentMaskedRegions = (this.maskedRegions || []).filter(
+        (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
       );
+
       const minLength = this.options.minVariantLength === undefined ? 50 : this.options.minVariantLength;
       const maxLength = this.maxVariantLength;
       this.currentSvMarkers = [];
-      if (this.showSvBreakpoints) {
+
+      if (this.showSvBreakpoints && Array.isArray(this.svVariants)) {
         this.svVariants.forEach((variant) => {
+          if (!isValidVariant(variant)) {
+            return;
+          }
           if (variantLength(variant) < minLength) {
             return;
           }
@@ -755,13 +821,13 @@ function WakhanCoverageTrack(HGC, ...args) {
           }
           const endpoints = [{ abs: variant.startAbs, side: "From" }];
           if (
-            Number.isFinite(variant.endAbs) &&
+            isFiniteNumber(variant.endAbs) &&
             Math.abs(variant.endAbs - variant.startAbs) > 1
           ) {
             endpoints.push({ abs: variant.endAbs, side: "To" });
           }
           endpoints.forEach((endpoint) => {
-            if (endpoint.abs >= fromX && endpoint.abs <= toX) {
+            if (isFiniteNumber(endpoint.abs) && endpoint.abs >= fromX && endpoint.abs <= toX) {
               this.currentSvMarkers.push({ variant, ...endpoint });
             }
           });
@@ -779,17 +845,27 @@ function WakhanCoverageTrack(HGC, ...args) {
       const color = this.HGC.utils.colorToHex(MASKED_REGION_COLOR);
 
       this.currentMaskedRegions.forEach((region) => {
-        const xStart = Math.max(leftAxisX, this.plotX(region.startAbs));
-        const xEnd = Math.min(rightAxisX, this.plotX(region.endAbs));
+        if (!region || !isFiniteNumber(region.startAbs) || !isFiniteNumber(region.endAbs)) {
+          return;
+        }
+        const rawXStart = this.plotX(region.startAbs);
+        const rawXEnd = this.plotX(region.endAbs);
+        if (!isFiniteNumber(rawXStart) || !isFiniteNumber(rawXEnd)) {
+          return;
+        }
+
+        const xStart = Math.max(leftAxisX, rawXStart);
+        const xEnd = Math.min(rightAxisX, rawXEnd);
         const width = xEnd - xStart;
         if (width <= 0) {
           return;
         }
         this.maskedRegionGraphics.beginFill(color, MASKED_REGION_ALPHA);
-        this.maskedRegionGraphics.drawRect(xStart, top, Math.max(1, width), height);
+        safeDrawRect(this.maskedRegionGraphics, xStart, top, Math.max(1, width), height, "drawMaskedRegions:fill");
         this.maskedRegionGraphics.endFill();
+
         this.maskedRegionGraphics.lineStyle(1, this.HGC.utils.colorToHex(MASKED_REGION_BORDER_COLOR), MASKED_REGION_BORDER_ALPHA);
-        this.maskedRegionGraphics.drawRect(xStart, top, Math.max(1, width), height);
+        safeDrawRect(this.maskedRegionGraphics, xStart, top, Math.max(1, width), height, "drawMaskedRegions:border");
       });
     }
 
@@ -805,116 +881,177 @@ function WakhanCoverageTrack(HGC, ...args) {
       );
 
       markers.forEach((marker) => {
-        const x = this.plotX(marker.abs);
-        if (x < leftAxisX || x > rightAxisX) {
-          return;
-        }
-        const color = this.HGC.utils.colorToHex(
-          SV_TYPE_COLORS[marker.variant.type] || SV_TYPE_COLORS.BND
-        );
-        this.svGraphics.lineStyle(1, color, SV_MARKER_ALPHA);
+        try {
+          if (!marker || !isFiniteNumber(marker.abs) || !marker.variant) {
+            return;
+          }
+          const x = this.plotX(marker.abs);
+          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) {
+            return;
+          }
+          const color = this.HGC.utils.colorToHex(
+            SV_TYPE_COLORS[marker.variant.type] || SV_TYPE_COLORS.BND
+          );
+          this.svGraphics.lineStyle(1, color, SV_MARKER_ALPHA);
 
-        const hp = marker.variant.hp;
-        let lineTop, lineBottom;
-        if (hp === "1") {
-          lineTop = top;
-          lineBottom = centerY;
-        } else if (hp === "2") {
-          lineTop = centerY;
-          lineBottom = top + height;
-        } else {
-          lineTop = top;
-          lineBottom = top + height;
-        }
+          const hp = marker.variant.hp;
+          let lineTop, lineBottom;
+          if (hp === "1") {
+            lineTop = top;
+            lineBottom = centerY;
+          } else if (hp === "2") {
+            lineTop = centerY;
+            lineBottom = top + height;
+          } else {
+            lineTop = top;
+            lineBottom = top + height;
+          }
 
-        this.svGraphics.moveTo(x, lineTop);
-        this.svGraphics.lineTo(x, lineBottom);
-        this.svHitRegions.push({
-          marker,
-          x,
-          top: lineTop,
-          bottom: lineBottom,
-        });
+          if (!isFiniteNumber(lineTop) || !isFiniteNumber(lineBottom)) {
+            return;
+          }
+
+          safeMoveTo(this.svGraphics, x, lineTop, "drawSvBreakpoints:moveTo");
+          safeLineTo(this.svGraphics, x, lineBottom, "drawSvBreakpoints:lineTo");
+
+          this.svHitRegions.push({
+            marker,
+            x,
+            top: lineTop,
+            bottom: lineBottom,
+          });
+        } catch (err) {
+          logDevSkip(marker?.variant, "Exception drawing breakpoint marker", { error: err?.message });
+        }
       });
     }
 
     drawCoveragePoints() {
-      if (!this.showCoverage) {
+      if (!this.showCoverage || !Array.isArray(this.currentCoverage)) {
         return;
       }
       const hp1Color = this.HGC.utils.colorToHex(HP1_POINT_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_POINT_COLOR);
       const halfDotSize = COVERAGE_DOT_SIZE / 2;
       const { leftAxisX, rightAxisX } = this.metrics();
-      const rawWidth = Math.max(1, this.dimensions[0]);
+      const rawWidth = Math.max(1, this.dimensions ? this.dimensions[0] : 1);
       const plotWidth = rightAxisX - leftAxisX;
+      if (!isFiniteNumber(plotWidth) || plotWidth <= 0) {
+        return;
+      }
+
       const visibleRows = sampleRows(
         this.currentCoverage,
         this.options.maxCoveragePoints || 6000
       );
 
+      // HP1 Points
       this.coverageGraphics.beginFill(hp1Color, 0.58);
       visibleRows.forEach((row) => {
-        const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
-        const x = leftAxisX + (rawX / rawWidth) * plotWidth;
-        if (x < leftAxisX || x > rightAxisX) {
-          return;
+        try {
+          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) {
+            return;
+          }
+          const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
+          if (!isFiniteNumber(rawX)) {
+            return;
+          }
+          const x = leftAxisX + (rawX / rawWidth) * plotWidth;
+          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) {
+            return;
+          }
+          const y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
+          if (y === null || !isFiniteNumber(y)) {
+            return;
+          }
+          safeDrawRect(
+            this.coverageGraphics,
+            x - halfDotSize,
+            y - halfDotSize,
+            COVERAGE_DOT_SIZE,
+            COVERAGE_DOT_SIZE,
+            "drawCoveragePoints:hp1"
+          );
+        } catch (err) {
+          logDevSkip(row, "Exception drawing HP1 coverage point", { error: err?.message });
         }
-        const y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
-        if (y === null) {
-          return;
-        }
-        this.coverageGraphics.drawRect(
-          x - halfDotSize,
-          y - halfDotSize,
-          COVERAGE_DOT_SIZE,
-          COVERAGE_DOT_SIZE
-        );
       });
+      this.coverageGraphics.endFill();
 
+      // HP2 Points
       this.coverageGraphics.beginFill(hp2Color, 0.58);
       visibleRows.forEach((row) => {
-        const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
-        const x = leftAxisX + (rawX / rawWidth) * plotWidth;
-        if (x < leftAxisX || x > rightAxisX) {
-          return;
+        try {
+          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) {
+            return;
+          }
+          const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
+          if (!isFiniteNumber(rawX)) {
+            return;
+          }
+          const x = leftAxisX + (rawX / rawWidth) * plotWidth;
+          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) {
+            return;
+          }
+          const y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
+          if (y === null || !isFiniteNumber(y)) {
+            return;
+          }
+          safeDrawRect(
+            this.coverageGraphics,
+            x - halfDotSize,
+            y - halfDotSize,
+            COVERAGE_DOT_SIZE,
+            COVERAGE_DOT_SIZE,
+            "drawCoveragePoints:hp2"
+          );
+        } catch (err) {
+          logDevSkip(row, "Exception drawing HP2 coverage point", { error: err?.message });
         }
-        const y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
-        if (y === null) {
-          return;
-        }
-        this.coverageGraphics.drawRect(
-          x - halfDotSize,
-          y - halfDotSize,
-          COVERAGE_DOT_SIZE,
-          COVERAGE_DOT_SIZE
-        );
       });
+      this.coverageGraphics.endFill();
     }
 
     drawCoverageSegments() {
       const hp1Color = this.HGC.utils.colorToHex(HP1_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_COLOR);
+
       const drawSegment = (segment, hp, color) => {
-        const { leftAxisX, rightAxisX } = this.metrics();
-        const xStart = Math.max(leftAxisX, this.plotX(segment.startAbs));
-        const xEnd = Math.min(rightAxisX, this.plotX(segment.endAbs));
-        const width = xEnd - xStart;
-        if (width <= 0) {
-          return;
+        try {
+          if (!segment || !isFiniteNumber(segment.startAbs) || !isFiniteNumber(segment.endAbs)) {
+            return;
+          }
+          const { leftAxisX, rightAxisX } = this.metrics();
+          const rawStartX = this.plotX(segment.startAbs);
+          const rawEndX = this.plotX(segment.endAbs);
+          if (!isFiniteNumber(rawStartX) || !isFiniteNumber(rawEndX)) {
+            return;
+          }
+
+          const xStart = Math.max(leftAxisX, rawStartX);
+          const xEnd = Math.min(rightAxisX, rawEndX);
+          const width = xEnd - xStart;
+          if (width <= 0 || !isFiniteNumber(width)) {
+            return;
+          }
+
+          const yCopyNumber = this.yCopyNumber(segment.copyNumber, hp);
+          if (yCopyNumber === null || !isFiniteNumber(yCopyNumber)) {
+            return;
+          }
+          const y = yCopyNumber - 2;
+          this.segmentGraphics.beginFill(color, 0.95);
+          safeDrawRect(this.segmentGraphics, xStart, y, Math.max(1, width), 4, "drawCoverageSegments");
+          this.segmentGraphics.endFill();
+        } catch (err) {
+          logDevSkip(segment, "Exception drawing coverage segment", { error: err?.message });
         }
-        const yCopyNumber = this.yCopyNumber(segment.copyNumber, hp);
-        if (yCopyNumber === null) {
-          return;
-        }
-        const y = yCopyNumber - 2;
-        this.segmentGraphics.beginFill(color, 0.95);
-        this.segmentGraphics.drawRect(xStart, y, Math.max(1, width), 4);
       };
-      if (this.showHp1) {
+
+      if (this.showHp1 && Array.isArray(this.currentHp1Segments)) {
         this.currentHp1Segments.forEach((segment) => drawSegment(segment, 1, hp1Color));
       }
-      if (this.showHp2) {
+      if (this.showHp2 && Array.isArray(this.currentHp2Segments)) {
         this.currentHp2Segments.forEach((segment) => drawSegment(segment, 2, hp2Color));
       }
     }
@@ -933,24 +1070,66 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
-      this.updateVisibleData();
-      this.drawChromosomeBackground();
-      this.drawMaskedRegions();
-      this.drawAxes();
-      this.drawSvBreakpoints();
-      this.drawCoveragePoints();
-      this.drawCoverageSegments();
+      // Sub-step isolated rendering calls
+      try {
+        this.updateVisibleData();
+      } catch (err) {
+        logDevSkip(null, "Error updating visible data in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawChromosomeBackground();
+      } catch (err) {
+        logDevSkip(null, "Error drawing chromosome background in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawMaskedRegions();
+      } catch (err) {
+        logDevSkip(null, "Error drawing masked regions in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawAxes();
+      } catch (err) {
+        logDevSkip(null, "Error drawing axes in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawSvBreakpoints();
+      } catch (err) {
+        logDevSkip(null, "Error drawing SV breakpoints in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawCoveragePoints();
+      } catch (err) {
+        logDevSkip(null, "Error drawing coverage points in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawCoverageSegments();
+      } catch (err) {
+        logDevSkip(null, "Error drawing coverage segments in coverage track", { error: err?.message });
+      }
     }
 
     getMouseOverHtml(trackX, trackY) {
+      if (!isFiniteNumber(trackX) || !isFiniteNumber(trackY)) {
+        return "";
+      }
       this.mouseOverGraphics.clear();
       const { leftAxisX, rightAxisX } = this.metrics();
       if (trackX < leftAxisX || trackX > rightAxisX) {
         return "";
       }
       const absX = this.plotAbsFromX(trackX);
-      const coverageHit = this.currentCoverage.find((row) => {
-        if (!this.showCoverage) {
+      if (!isFiniteNumber(absX)) {
+        return "";
+      }
+
+      const coverageHit = (this.currentCoverage || []).find((row) => {
+        if (!this.showCoverage || !row) {
           return false;
         }
         if (absX < row.startAbs || absX > row.endAbs) {
@@ -959,16 +1138,16 @@ function WakhanCoverageTrack(HGC, ...args) {
         const hp1Y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
         const hp2Y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
         return (
-          (hp1Y !== null && Math.abs(trackY - hp1Y) <= 6) ||
-          (hp2Y !== null && Math.abs(trackY - hp2Y) <= 6)
+          (hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 6) ||
+          (hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 6)
         );
       });
 
       if (coverageHit) {
         const hp1Y = this.yCopyNumber(coverageHit.hp1CopyNumberEquivalent, 1);
         const hp2Y = this.yCopyNumber(coverageHit.hp2CopyNumberEquivalent, 2);
-        const hp = hp1Y !== null && (
-          hp2Y === null ||
+        const hp = hp1Y !== null && isFiniteNumber(hp1Y) && (
+          hp2Y === null || !isFiniteNumber(hp2Y) ||
           Math.abs(trackY - hp1Y) <= Math.abs(trackY - hp2Y)
         ) ? "HP-1" : "HP-2";
         const coverage = hp === "HP-1" ? coverageHit.hp1 : coverageHit.hp2;
@@ -987,9 +1166,9 @@ function WakhanCoverageTrack(HGC, ...args) {
         </table>`;
       }
 
-      const svHit = this.svHitRegions
+      const svHit = (this.svHitRegions || [])
         .map((region) => {
-          if (Math.abs(trackX - region.x) <= 5 && trackY >= region.top && trackY <= region.bottom) {
+          if (region && Math.abs(trackX - region.x) <= 5 && trackY >= region.top && trackY <= region.bottom) {
             return { region, distance: Math.abs(trackX - region.x) };
           }
           return null;
@@ -1016,15 +1195,15 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
 
       const visibleSegments = []
-        .concat(this.showHp1 ? this.currentHp1Segments.map((segment) => ({ ...segment, hp: "HP-1", hpIndex: 1 })) : [])
-        .concat(this.showHp2 ? this.currentHp2Segments.map((segment) => ({ ...segment, hp: "HP-2", hpIndex: 2 })) : []);
+        .concat(this.showHp1 ? (this.currentHp1Segments || []).map((segment) => ({ ...segment, hp: "HP-1", hpIndex: 1 })) : [])
+        .concat(this.showHp2 ? (this.currentHp2Segments || []).map((segment) => ({ ...segment, hp: "HP-2", hpIndex: 2 })) : []);
       const segmentHit = visibleSegments
         .find((segment) => {
-          if (absX < segment.startAbs || absX > segment.endAbs) {
+          if (!segment || absX < segment.startAbs || absX > segment.endAbs) {
             return false;
           }
           const y = this.yCopyNumber(segment.copyNumber, segment.hpIndex);
-          return y !== null && Math.abs(trackY - y) <= 7;
+          return y !== null && isFiniteNumber(y) && Math.abs(trackY - y) <= 7;
         });
 
       if (!segmentHit) {

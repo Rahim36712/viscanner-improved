@@ -1,72 +1,39 @@
 import OriginalScannerResultTrack from "smaht-higlass-misc/es/ScannerResultTrack";
-import { getPlotBounds, mapTrackX } from "./plotBounds";
+import {
+  getPlotBounds,
+  mapTrackX,
+  registerGlobalChromExtents,
+  getGlobalMasterChromBounds,
+} from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 
 const CHROM_BAND_COLOR = "#e7eaed";
 const BAF_COLOR = "#9A9D32";
-function getChromosomeDataBounds(track) {
-  const dataLen = track.data ? track.data.length : 0;
-  if (track._cachedChromBounds && track._cachedDataLen === dataLen) {
-    return track._cachedChromBounds;
-  }
-  if (!track.chromInfo || !track.chromInfo.cumPositions) {
-    return null;
-  }
-
-  const cumPositions = track.chromInfo.cumPositions;
-  const chromLengths = track.chromInfo.chromLengths;
-
-  const chrMaxEnd = new Map();
-  const chrMinStart = new Map();
-
-  const allSegments = track.data || [];
-  for (let i = 0; i < allSegments.length; i++) {
-    const seg = allSegments[i];
-    if (!seg.chr) continue;
-    const currentMax = chrMaxEnd.get(seg.chr);
-    if (currentMax === undefined || seg.toAbs > currentMax) {
-      chrMaxEnd.set(seg.chr, seg.toAbs);
-    }
-    const currentMin = chrMinStart.get(seg.chr);
-    if (currentMin === undefined || seg.fromAbs < currentMin) {
-      chrMinStart.set(seg.chr, seg.fromAbs);
-    }
-  }
-
-  const bounds = [];
-  for (let i = 0; i < cumPositions.length; i++) {
-    const cp = cumPositions[i];
-    const chrName = cp.chr;
-    const officialLen = Number(chromLengths[chrName]) || 0;
-    const officialStart = cp.pos;
-    const officialEnd = officialStart + officialLen;
-
-    const dataStart = chrMinStart.get(chrName);
-    const dataEnd = chrMaxEnd.get(chrName);
-
-    let startPos = dataStart !== undefined ? Math.min(officialStart, dataStart) : officialStart;
-    let endPos = dataEnd !== undefined ? dataEnd : officialEnd;
-
-    if (i > 0) {
-      startPos = bounds[i - 1].end;
-    }
-
-    bounds.push({ chr: chrName, start: startPos, end: endPos });
-  }
-
-  track._cachedChromBounds = bounds;
-  track._cachedDataLen = dataLen;
-  return bounds;
-}
 
 function drawChromosomeBands(track) {
   if (!track.chromInfo || !track.chromInfo.cumPositions) {
     return;
   }
 
+  // Register all BAF segment & SNP extents globally ONCE per dataset change (not per frame)
+  const dataLen = (track.data ? track.data.length : 0) + (track.snpData ? track.snpData.length : 0);
+  if (track._extentsRegisteredKey !== dataLen && dataLen > 0) {
+    track._extentsRegisteredKey = dataLen;
+    const allSegs = track.data || [];
+    for (let i = 0; i < allSegs.length; i++) {
+      const seg = allSegs[i];
+      if (seg.chr) registerGlobalChromExtents(seg.chr, seg.fromAbs, seg.toAbs);
+    }
+    const allSnps = track.snpData || [];
+    for (let i = 0; i < allSnps.length; i++) {
+      const snp = allSnps[i];
+      if (snp.chr) registerGlobalChromExtents(snp.chr, snp.posAbs, snp.posAbs);
+    }
+  }
+
   const { left, right } = getPlotBounds(track);
   const bandColor = track.HGC.utils.colorToHex(CHROM_BAND_COLOR);
-  const bounds = getChromosomeDataBounds(track);
+  const bounds = getGlobalMasterChromBounds(track.chromInfo);
 
   track.chromInfo.cumPositions.forEach((chromosome, index) => {
     if (index % 2 !== 0) {
@@ -189,46 +156,62 @@ function ScannerResultTrackPatched(HGC, ...args) {
     this.segmentGraphics.removeChildren();
     this.segmentGraphics.clear();
 
-    this.segmentGraphics.beginFill(snpColorHex, 0.4);
-    this.currentFilteredListSnp.forEach((segment) => {
-      const xPos = isBafTrack ? mapTrackX(this, segment.posAbs) : this._xScale(segment.posAbs);
-      const bounds = getPlotBounds(this);
-      if (isBafTrack && (xPos < bounds.left || xPos > bounds.right)) {
-        return;
-      }
-      // BAF points are drawn smaller for denser, cleaner scatter
-      const pointRadius = isBafTrack ? 1.5 : 3;
-      this.segmentGraphics.drawCircle(
-        xPos,
-        this.currentYScalePoints(segment.yvalue),
-        pointRadius
-      );
-    });
+    try {
+      this.segmentGraphics.beginFill(snpColorHex, 0.4);
+      this.currentFilteredListSnp.forEach((segment) => {
+        if (!segment || !Number.isFinite(segment.posAbs) || !Number.isFinite(segment.yvalue)) {
+          return;
+        }
+        const xPos = isBafTrack ? mapTrackX(this, segment.posAbs) : this._xScale(segment.posAbs);
+        const yPos = this.currentYScalePoints(segment.yvalue);
+        const bounds = getPlotBounds(this);
+        if (!Number.isFinite(xPos) || !Number.isFinite(yPos)) {
+          return;
+        }
+        if (isBafTrack && (xPos < bounds.left || xPos > bounds.right)) {
+          return;
+        }
+        const pointRadius = isBafTrack ? 1.5 : 3;
+        this.segmentGraphics.drawCircle(xPos, yPos, pointRadius);
+      });
 
-    this.currentFilteredList.forEach((segment) => {
-      const bounds = getPlotBounds(this);
-      const xPos = isBafTrack
-        ? Math.max(bounds.left, mapTrackX(this, segment.fromAbs))
-        : this._xScale(segment.fromAbs);
-      const xEnd = isBafTrack
-        ? Math.min(bounds.right, mapTrackX(this, segment.toAbs))
-        : this._xScale(segment.toAbs);
-      const width = xEnd - xPos;
-      if (isBafTrack && width <= 0) {
-        return;
-      }
-      this.segmentGraphics.beginFill(segmentColorHex);
-      this.segmentGraphics.drawRect(
-        xPos,
-        this.currentYScaleSegments(segment.yvalue),
-        width,
-        this.options.segmentHeight
-      );
-      if (this.options.show_total_cn) {
-        this.segmentGraphics.beginFill(blackColorHex);
-        this.segmentGraphics.drawRect(xPos, this.currentYScalePoints(segment.total_cn), width, 2);
-      }
-    });
+      this.currentFilteredList.forEach((segment) => {
+        if (!segment || !Number.isFinite(segment.fromAbs) || !Number.isFinite(segment.toAbs)) {
+          return;
+        }
+        const bounds = getPlotBounds(this);
+        const xPos = isBafTrack
+          ? Math.max(bounds.left, mapTrackX(this, segment.fromAbs))
+          : this._xScale(segment.fromAbs);
+        const xEnd = isBafTrack
+          ? Math.min(bounds.right, mapTrackX(this, segment.toAbs))
+          : this._xScale(segment.toAbs);
+        const width = xEnd - xPos;
+        if (isBafTrack && width <= 0) {
+          return;
+        }
+        const yPos = this.currentYScaleSegments(segment.yvalue);
+        if (!Number.isFinite(xPos) || !Number.isFinite(yPos) || !Number.isFinite(width)) {
+          return;
+        }
+        this.segmentGraphics.beginFill(segmentColorHex);
+        this.segmentGraphics.drawRect(
+          xPos,
+          yPos,
+          width,
+          this.options.segmentHeight
+        );
+        if (this.options.show_total_cn && Number.isFinite(segment.total_cn)) {
+          const yTotalCn = this.currentYScalePoints(segment.total_cn);
+          if (Number.isFinite(yTotalCn)) {
+            this.segmentGraphics.beginFill(blackColorHex);
+            this.segmentGraphics.drawRect(xPos, yTotalCn, width, 2);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn("ScannerResultTrack graphics render caught error silently:", err);
+    }
 
     this.loadingText.text = "";
   };

@@ -246,14 +246,13 @@ function resizeContainer(layout) {
 
 function dispatchResize(layout) {
   window.__viscannerApplyingLayout = true;
-  resizeSvgLayers(layout);
   window.dispatchEvent(new Event("resize"));
-  window.__viscannerApplyingLayout = false;
   window.requestAnimationFrame(() => {
-    window.__viscannerApplyingLayout = true;
     resizeSvgLayers(layout);
     window.dispatchEvent(new Event("resize"));
-    window.__viscannerApplyingLayout = false;
+    window.setTimeout(() => {
+      window.__viscannerApplyingLayout = false;
+    }, 100);
   });
 }
 

@@ -19,6 +19,7 @@ import { scheduleFitToContent } from "./higlassLayout";
 // import { default as CohortTrack } from "higlass-cohort/es/CohortTrack";
 // import { default as GeneListTrack } from 'higlass-cohort/es/GeneListTrack';
 // import { BigwigDataFetcher } from "higlass-bigwig-datafetcher";
+import HiGlassErrorBoundary from "./HiGlassErrorBoundary";
 import viewConfig from "./viewConfig.json";
 
 export class HiglassBrowser extends React.PureComponent {
@@ -109,7 +110,7 @@ export class HiglassBrowser extends React.PureComponent {
   componentDidMount() {
     this.handleWindowResize = () => {
       if (!window.__viscannerApplyingLayout) {
-        scheduleFitToContent();
+        scheduleFitToContent({ delay: 150 });
       }
     };
     window.addEventListener("resize", this.handleWindowResize);
@@ -162,11 +163,13 @@ export class HiglassBrowser extends React.PureComponent {
 
   render() {
     return (
-      <HiGlassComponent
-        viewConfig={this.viewConfig}
-        bounded={true}
-        ref={this.hgc}
-      />
+      <HiGlassErrorBoundary>
+        <HiGlassComponent
+          viewConfig={this.viewConfig}
+          bounded={true}
+          ref={this.hgc}
+        />
+      </HiGlassErrorBoundary>
     );
   }
 }

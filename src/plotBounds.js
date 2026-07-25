@@ -30,3 +30,61 @@ export function unmapTrackX(track, plotX) {
   const rawWidth = Math.max(1, Number(rawRange[1]) - rawLeft);
   return rawScale.invert(rawLeft + ((plotX - left) / Math.max(1, right - left)) * rawWidth);
 }
+
+export function resetGlobalChromExtents() {
+  window._globalChromExtents = { min: new Map(), max: new Map() };
+  window._globalMasterBoundsCache = null;
+}
+
+export function registerGlobalChromExtents(chrName, minStart, maxEnd) {
+  if (!window._globalChromExtents) {
+    window._globalChromExtents = { min: new Map(), max: new Map() };
+  }
+  const minMap = window._globalChromExtents.min;
+  const maxMap = window._globalChromExtents.max;
+
+  if (Number.isFinite(minStart)) {
+    const curMin = minMap.get(chrName);
+    if (curMin === undefined || minStart < curMin) minMap.set(chrName, minStart);
+  }
+  if (Number.isFinite(maxEnd)) {
+    const curMax = maxMap.get(chrName);
+    if (curMax === undefined || maxEnd > curMax) maxMap.set(chrName, maxEnd);
+  }
+  window._globalMasterBoundsCache = null;
+}
+
+export function getGlobalMasterChromBounds(chromInfo) {
+  if (!chromInfo || !chromInfo.cumPositions) return null;
+  if (window._globalMasterBoundsCache) {
+    return window._globalMasterBoundsCache;
+  }
+
+  const cumPositions = chromInfo.cumPositions;
+  const chromLengths = chromInfo.chromLengths;
+  const extents = window._globalChromExtents || { min: new Map(), max: new Map() };
+
+  const bounds = [];
+  for (let i = 0; i < cumPositions.length; i++) {
+    const cp = cumPositions[i];
+    const chrName = cp.chr;
+    const officialLen = Number(chromLengths[chrName]) || 0;
+    const officialStart = cp.pos;
+    const officialEnd = officialStart + officialLen;
+
+    const dataStart = extents.min.get(chrName);
+    const dataEnd = extents.max.get(chrName);
+
+    let startPos = dataStart !== undefined ? Math.min(officialStart, dataStart) : officialStart;
+    let endPos = dataEnd !== undefined ? Math.max(officialEnd, dataEnd) : officialEnd;
+
+    if (i > 0) {
+      startPos = bounds[i - 1].end;
+    }
+
+    bounds.push({ chr: chrName, start: startPos, end: endPos });
+  }
+
+  window._globalMasterBoundsCache = bounds;
+  return bounds;
+}
