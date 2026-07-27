@@ -81,7 +81,13 @@ function parseSnpData(v, delimiter = "\t") {
     if (i === 0 && (Number.isNaN(pos) || Number.isNaN(value))) {
       return;
     }
-    higlassData.push([normalizeChromosome(segment[0]), pos, value]);
+    const chr = normalizeChromosome(segment[0]);
+    const item = [chr, pos, value];
+    item.chr = chr;
+    item.pos = pos;
+    item.yvalue = value;
+    item.baf = value;
+    higlassData.push(item);
   });
   return higlassData;
 }

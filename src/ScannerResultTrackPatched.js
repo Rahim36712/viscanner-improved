@@ -11,6 +11,25 @@ import { createHighResBase64Extractor } from "./pdfExport";
 const CHROM_BAND_COLOR = "#e7eaed";
 const BAF_COLOR = "#9A9D32";
 
+function formatPos(val) {
+  if (typeof val === "number" && !isNaN(val)) {
+    return val.toLocaleString("en-US");
+  }
+  return val || "-";
+}
+
+function formatBafValue(val) {
+  if (typeof val !== "number" || isNaN(val)) return "-";
+  const pct = (val <= 1.0 ? val * 100 : val).toFixed(1);
+  const numStr = val.toFixed(2);
+  return `${numStr} (${pct}%)`;
+}
+
+function formatCopyNumber(val) {
+  if (typeof val !== "number" || isNaN(val)) return "-";
+  return Number(val).toFixed(2).replace(/\.00$/, "");
+}
+
 function drawChromosomeBands(track) {
   if (!track.chromInfo || !track.chromInfo.cumPositions) {
     return;
@@ -214,36 +233,70 @@ function ScannerResultTrackPatched(HGC, ...args) {
       console.warn("ScannerResultTrack graphics render caught error silently:", err);
     }
 
+    if (!this.mouseOverGraphics && this.pMain) {
+      this.mouseOverGraphics = new this.HGC.libraries.PIXI.Graphics();
+      this.pMain.addChild(this.mouseOverGraphics);
+    }
+
     this.loadingText.text = "";
   };
 
   const originalSetData = instance.setData.bind(instance);
   instance.setData = function patchedSetData(data) {
     this.options.data = data;
-    if (this.chromInfo && Array.isArray(data)) {
+    const res = originalSetData(data);
+    if (this.chromInfo && Array.isArray(this.data)) {
       const bounds = getGlobalMasterChromBounds(this.chromInfo);
-      data.forEach((seg) => {
-        if (seg.chr && Number.isFinite(seg.from || seg.start)) {
+      this.data.forEach((seg) => {
+        if (seg && seg.chr && Number.isFinite(seg.from || seg.start)) {
           seg.fromAbs = getDynamicChrAbs(seg.chr, seg.from || seg.start, this.chromInfo, bounds);
           seg.toAbs = getDynamicChrAbs(seg.chr, seg.to || seg.end || seg.from, this.chromInfo, bounds);
         }
       });
     }
-    return originalSetData(data);
+    return res;
   };
 
   const originalSetSnpData = instance.setSnpData.bind(instance);
   instance.setSnpData = function patchedSetSnpData(data) {
     this.options.snpData = data;
-    if (this.chromInfo && Array.isArray(data)) {
+    const formattedData = Array.isArray(data)
+      ? data.map((item) => {
+          if (Array.isArray(item)) {
+            return item;
+          }
+          if (item && typeof item === "object") {
+            const chr = item.chr || item[0];
+            const pos = item.pos !== undefined ? item.pos : item[1];
+            const yvalue =
+              item.yvalue !== undefined
+                ? item.yvalue
+                : item.baf !== undefined
+                ? item.baf
+                : item[2];
+            const arr = [chr, pos, yvalue];
+            arr.chr = chr;
+            arr.pos = pos;
+            arr.yvalue = yvalue;
+            arr.baf = yvalue;
+            arr.hp = item.hp;
+            return arr;
+          }
+          return item;
+        })
+      : [];
+
+    const res = originalSetSnpData(formattedData);
+
+    if (this.chromInfo && Array.isArray(this.snpData)) {
       const bounds = getGlobalMasterChromBounds(this.chromInfo);
-      data.forEach((snp) => {
-        if (snp.chr && Number.isFinite(snp.pos)) {
+      this.snpData.forEach((snp) => {
+        if (snp && snp.chr && Number.isFinite(snp.pos)) {
           snp.posAbs = getDynamicChrAbs(snp.chr, snp.pos, this.chromInfo, bounds);
         }
       });
     }
-    return originalSetSnpData(data);
+    return res;
   };
 
   const originalRerender = instance.rerender.bind(instance);
@@ -254,6 +307,120 @@ function ScannerResultTrackPatched(HGC, ...args) {
 
   instance.updateExistingGraphics = patchedUpdateExistingGraphics.bind(instance);
   applyScaleConfig();
+
+  instance.getMouseOverHtml = function getMouseOverHtml(trackX, trackY) {
+    if (!Number.isFinite(trackX) || !Number.isFinite(trackY)) {
+      return "";
+    }
+    if (this.mouseOverGraphics) {
+      this.mouseOverGraphics.clear();
+    }
+    const bounds = getPlotBounds(this);
+    if (trackX < bounds.left || trackX > bounds.right) {
+      return "";
+    }
+
+    const isBafTrack = this.options.yValue === "baf";
+    const snpList = this.currentFilteredListSnp || [];
+    let bestHit = null;
+    let minDistance = 8.0;
+
+    for (let i = 0; i < snpList.length; i++) {
+      const snp = snpList[i];
+      if (!snp || !Number.isFinite(snp.posAbs) || !Number.isFinite(snp.yvalue)) {
+        continue;
+      }
+      const xPos = isBafTrack ? mapTrackX(this, snp.posAbs) : this._xScale(snp.posAbs);
+      const yPos = this.currentYScalePoints ? this.currentYScalePoints(snp.yvalue) : null;
+      if (!Number.isFinite(xPos) || !Number.isFinite(yPos)) {
+        continue;
+      }
+      if (isBafTrack && (xPos < bounds.left || xPos > bounds.right)) {
+        continue;
+      }
+
+      const dist = Math.hypot(trackX - xPos, trackY - yPos);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestHit = { snp, xPos, yPos };
+      }
+    }
+
+    if (bestHit) {
+      const { snp, xPos, yPos } = bestHit;
+      if (this.mouseOverGraphics) {
+        this.mouseOverGraphics.lineStyle(1.5, 0x000000, 0.85);
+        this.mouseOverGraphics.drawCircle(xPos, yPos, isBafTrack ? 3.5 : 5);
+      }
+
+      const segList = this.currentFilteredList || this.data || [];
+      const overlapSeg = segList.find((seg) => {
+        if (!seg) return false;
+        if (Number.isFinite(seg.fromAbs) && Number.isFinite(seg.toAbs)) {
+          return snp.posAbs >= seg.fromAbs && snp.posAbs <= seg.toAbs;
+        }
+        if (seg.chr && seg.chr === snp.chr && Number.isFinite(seg.start) && Number.isFinite(seg.end)) {
+          return snp.pos >= seg.start && snp.pos <= seg.end;
+        }
+        return false;
+      });
+
+      const bedCopyNumber = overlapSeg
+        ? (overlapSeg.total_cn ?? overlapSeg.copyNumber ?? overlapSeg.yvalue)
+        : undefined;
+
+      const hpText = snp.hp
+        ? snp.hp
+        : (snp.yvalue >= 0.5 ? "HP-1" : "HP-2");
+
+      return `<table style="margin-top:3px;border:1px solid #333333;">
+        <tr><td style="font-weight:bold;">Position</td><td>${snp.chr ? `${snp.chr}: ` : ""}${formatPos(snp.pos)}</td></tr>
+        <tr><td style="font-weight:bold;">B-allele frequency</td><td>${formatBafValue(snp.yvalue)}</td></tr>
+        <tr><td style="font-weight:bold;">Haplotype</td><td>${hpText}</td></tr>
+        <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(bedCopyNumber)}</td></tr>
+      </table>`;
+    }
+
+    const segList = this.currentFilteredList || [];
+    const segHit = segList.find((segment) => {
+      if (!segment || !Number.isFinite(segment.fromAbs) || !Number.isFinite(segment.toAbs)) {
+        return false;
+      }
+      const xPos = isBafTrack
+        ? Math.max(bounds.left, mapTrackX(this, segment.fromAbs))
+        : this._xScale(segment.fromAbs);
+      const xEnd = isBafTrack
+        ? Math.min(bounds.right, mapTrackX(this, segment.toAbs))
+        : this._xScale(segment.toAbs);
+      const yPos = this.currentYScaleSegments ? this.currentYScaleSegments(segment.yvalue) : null;
+      if (!Number.isFinite(xPos) || !Number.isFinite(xEnd) || !Number.isFinite(yPos)) {
+        return false;
+      }
+      const segH = this.options.segmentHeight || 10;
+      return (
+        trackX >= xPos &&
+        trackX <= xEnd &&
+        trackY >= yPos - 2 &&
+        trackY <= yPos + segH + 2
+      );
+    });
+
+    if (segHit) {
+      const posStart = segHit.start ?? segHit.from;
+      const posEnd = segHit.end ?? segHit.to;
+      const posStr = segHit.chr && Number.isFinite(posStart) && Number.isFinite(posEnd)
+        ? `${segHit.chr}: ${formatPos(posStart)} - ${formatPos(posEnd)}`
+        : "-";
+
+      return `<table style="margin-top:3px;border:1px solid #333333;">
+        <tr><td style="font-weight:bold;">Position</td><td>${posStr}</td></tr>
+        <tr><td style="font-weight:bold;">Value (${isBafTrack ? "BAF" : "RDR"})</td><td>${formatBafValue(segHit.yvalue)}</td></tr>
+        <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(segHit.total_cn ?? segHit.copyNumber ?? segHit.yvalue)}</td></tr>
+      </table>`;
+    }
+
+    return "";
+  };
 
   const originalCreateLegendGraphics = instance.createLegendGraphics.bind(instance);
   instance.createLegendGraphics = function patchedCreateLegendGraphics(maxValue) {
