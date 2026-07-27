@@ -7,6 +7,7 @@ import {
   unmapTrackX,
   registerGlobalChromExtents,
   getGlobalMasterChromBounds,
+  getDynamicChrAbs,
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 import {
@@ -414,12 +415,14 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
+      const masterBounds = getGlobalMasterChromBounds(this.chromInfo);
+
       (data.coverage || []).forEach((row) => {
         if (!row || !this.chromInfo.chrPositions[row.chr]) {
           return;
         }
-        const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
-        const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+        const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
+        const endAbs = getDynamicChrAbs(row.chr, row.end, this.chromInfo, masterBounds);
         if (isFiniteNumber(startAbs) && isFiniteNumber(endAbs)) {
           this.coverage.push({
             chr: row.chr,
@@ -437,8 +440,8 @@ function WakhanCoverageTrack(HGC, ...args) {
         (rows || [])
           .filter((row) => row && this.chromInfo.chrPositions[row.chr])
           .map((row) => {
-            const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
-            const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+            const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
+            const endAbs = getDynamicChrAbs(row.chr, row.end, this.chromInfo, masterBounds);
             return {
               chr: row.chr,
               start: row.start,
@@ -457,8 +460,8 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.maskedRegions = (data.maskedRegions || [])
         .filter((row) => row && this.chromInfo.chrPositions[row.chr])
         .map((row) => {
-          const startAbs = chrToAbs(row.chr, row.start, this.chromInfo);
-          const endAbs = chrToAbs(row.chr, row.end, this.chromInfo);
+          const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
+          const endAbs = getDynamicChrAbs(row.chr, row.end, this.chromInfo, masterBounds);
           return {
             chr: row.chr,
             start: row.start,

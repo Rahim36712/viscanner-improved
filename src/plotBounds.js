@@ -88,3 +88,38 @@ export function getGlobalMasterChromBounds(chromInfo) {
   window._globalMasterBoundsCache = bounds;
   return bounds;
 }
+
+export function registerDatasetExtents(chromInfo, dataSets = {}) {
+  if (!chromInfo || !chromInfo.chrPositions) return;
+
+  const registerRow = (chr, start, end) => {
+    const chrObj = chromInfo.chrPositions[chr];
+    if (!chrObj) return;
+    const basePos = chrObj.pos;
+    const startAbs = Number.isFinite(start) ? basePos + start : basePos;
+    const endAbs = Number.isFinite(end) ? basePos + end : startAbs;
+    registerGlobalChromExtents(chr, startAbs, endAbs);
+  };
+
+  (dataSets.hp1Segments || []).forEach((row) => registerRow(row.chr, row.start, row.end));
+  (dataSets.hp2Segments || []).forEach((row) => registerRow(row.chr, row.start, row.end));
+  (dataSets.coverage || []).forEach((row) => registerRow(row.chr, row.start, row.end));
+  (dataSets.bafData || dataSets.data || []).forEach((row) =>
+    registerRow(row.chr, row.from || row.start || row.pos, row.to || row.end || row.pos)
+  );
+  (dataSets.snpData || []).forEach((row) => registerRow(row.chr, row.pos, row.pos));
+}
+
+export function getDynamicChrAbs(chrName, relPos, chromInfo, customBounds) {
+  if (!chromInfo || !chromInfo.cumPositions) return Number(relPos) || 0;
+  const bounds = customBounds || getGlobalMasterChromBounds(chromInfo);
+  if (!bounds) return Number(relPos) || 0;
+
+  const idx = chromInfo.cumPositions.findIndex((cp) => cp.chr === chrName);
+  if (idx >= 0 && bounds[idx]) {
+    return bounds[idx].start + (Number(relPos) || 0);
+  }
+
+  const chrObj = chromInfo.chrPositions ? chromInfo.chrPositions[chrName] : null;
+  return (chrObj ? chrObj.pos : 0) + (Number(relPos) || 0);
+}

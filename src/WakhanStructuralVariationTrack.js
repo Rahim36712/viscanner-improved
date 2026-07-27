@@ -1,7 +1,7 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
-import { getPlotBounds, mapTrackX } from "./plotBounds";
+import { getPlotBounds, mapTrackX, getGlobalMasterChromBounds } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 import {
   isFiniteNumber,
@@ -282,18 +282,28 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         return;
       }
 
+      const bounds = getGlobalMasterChromBounds(this.chromInfo);
       const bandColor = this.HGC.utils.colorToHex(CHROM_BAND_COLOR);
       this.chromInfo.cumPositions.forEach((chromosome, index) => {
         if (index % 2 !== 0) {
           return;
         }
-        const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
-        if (!isFiniteNumber(chrLength)) {
-          return;
+
+        let startPos, endPos;
+        if (bounds && bounds[index]) {
+          startPos = bounds[index].start;
+          endPos = bounds[index].end;
+        } else {
+          const chrLength = Number(this.chromInfo.chromLengths[chromosome.chr]);
+          if (!isFiniteNumber(chrLength)) {
+            return;
+          }
+          startPos = chromosome.pos;
+          endPos = chromosome.pos + chrLength;
         }
 
-        const rawStartX = this.plotX(chromosome.pos);
-        const rawEndX = this.plotX(chromosome.pos + chrLength);
+        const rawStartX = this.plotX(startPos);
+        const rawEndX = this.plotX(endPos);
         if (!isFiniteNumber(rawStartX) || !isFiniteNumber(rawEndX)) {
           return;
         }

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
 import { scheduleFitToContent } from "./higlassLayout";
+import { registerDatasetExtents } from "./plotBounds";
 
 async function decompressBlob(blob) {
   let ds = new DecompressionStream("gzip");
@@ -453,6 +454,13 @@ function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, mask
 
   const wakhanTrack = getTrackObject(hgc, "wakhan-coverage-track");
   if (wakhanTrack) {
+    if (wakhanTrack.chromInfo) {
+      registerDatasetExtents(wakhanTrack.chromInfo, {
+        coverage: coverageRows,
+        hp1Segments,
+        hp2Segments,
+      });
+    }
     wakhanTrack.setData({
       coverage: coverageRows,
       hp1Segments,
@@ -470,6 +478,12 @@ function updateBafSnpTrack(higlassData) {
 
   const t1 = getTrackObject(hgc, "scanner-result-track-1");
   if (t1) {
+    if (t1.chromInfo) {
+      registerDatasetExtents(t1.chromInfo, {
+        snpData: higlassData,
+        bafData: higlassData,
+      });
+    }
     t1.setSnpData(higlassData);
   }
 

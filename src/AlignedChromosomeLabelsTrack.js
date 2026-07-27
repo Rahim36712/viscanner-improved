@@ -1,7 +1,13 @@
 import BaseTrack from "smaht-higlass-misc/es/BaseTrack";
 import { ChromosomeInfo } from "smaht-higlass-misc/es/chrom-utils";
 import { scaleLinear } from "d3-scale";
-import { getPlotBounds, mapTrackX, unmapTrackX, PLOT_LEFT } from "./plotBounds";
+import {
+  getPlotBounds,
+  mapTrackX,
+  unmapTrackX,
+  PLOT_LEFT,
+  getGlobalMasterChromBounds,
+} from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 
 const AXIS_COLOR = "#808080";
@@ -206,12 +212,14 @@ function AlignedChromosomeLabelsTrack(HGC, ...args) {
           continue;
         }
 
-        // Screen boundaries of this chromosome, clamped to plot bounds
+        const masterBounds = getGlobalMasterChromBounds(this.chromInfo);
+        const endPos =
+          masterBounds && masterBounds[i]
+            ? masterBounds[i].end
+            : cumPos.pos + chromLen;
+
         const vpLeft = Math.max(left, mapTrackX(this, cumPos.pos));
-        const vpRight = Math.min(
-          right,
-          mapTrackX(this, cumPos.pos + chromLen)
-        );
+        const vpRight = Math.min(right, mapTrackX(this, endPos));
 
         if (vpRight <= left || vpLeft >= right || vpRight <= vpLeft) {
           continue;

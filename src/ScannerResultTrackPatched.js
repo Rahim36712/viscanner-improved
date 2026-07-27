@@ -4,6 +4,7 @@ import {
   mapTrackX,
   registerGlobalChromExtents,
   getGlobalMasterChromBounds,
+  getDynamicChrAbs,
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 
@@ -219,12 +220,29 @@ function ScannerResultTrackPatched(HGC, ...args) {
   const originalSetData = instance.setData.bind(instance);
   instance.setData = function patchedSetData(data) {
     this.options.data = data;
+    if (this.chromInfo && Array.isArray(data)) {
+      const bounds = getGlobalMasterChromBounds(this.chromInfo);
+      data.forEach((seg) => {
+        if (seg.chr && Number.isFinite(seg.from || seg.start)) {
+          seg.fromAbs = getDynamicChrAbs(seg.chr, seg.from || seg.start, this.chromInfo, bounds);
+          seg.toAbs = getDynamicChrAbs(seg.chr, seg.to || seg.end || seg.from, this.chromInfo, bounds);
+        }
+      });
+    }
     return originalSetData(data);
   };
 
   const originalSetSnpData = instance.setSnpData.bind(instance);
   instance.setSnpData = function patchedSetSnpData(data) {
     this.options.snpData = data;
+    if (this.chromInfo && Array.isArray(data)) {
+      const bounds = getGlobalMasterChromBounds(this.chromInfo);
+      data.forEach((snp) => {
+        if (snp.chr && Number.isFinite(snp.pos)) {
+          snp.posAbs = getDynamicChrAbs(snp.chr, snp.pos, this.chromInfo, bounds);
+        }
+      });
+    }
     return originalSetSnpData(data);
   };
 
