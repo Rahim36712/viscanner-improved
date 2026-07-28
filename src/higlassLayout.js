@@ -46,16 +46,15 @@ function isLayoutVisible(track) {
 
 function expandedTrackHeight(track) {
   const options = track.options || {};
-  return Math.max(
-    DEFAULT_TRACK_HEIGHT,
+  const fallbackHeight = 90;
+  const configured = positiveValue(
+    options.layoutHeight,
     positiveValue(
-      options.layoutHeight,
-      positiveValue(
-        options.expandedHeight,
-        positiveValue(track.defaultHeight, positiveValue(track.height, DEFAULT_TRACK_HEIGHT))
-      )
+      options.expandedHeight,
+      positiveValue(track.defaultHeight, positiveValue(track.height, fallbackHeight))
     )
   );
+  return configured > 1 ? configured : fallbackHeight;
 }
 
 function collapsedTrackHeight(track) {

@@ -112,6 +112,7 @@
                   "variants": [],
                   "matchedIds": []
                 },
+                "expandedHeight": 90,
                 "arcHeightMultiplier": 5.0
               },
               "height": 90,
@@ -162,6 +163,7 @@
                 "showTrack": true,
                 "layoutAfterUid": "wakhan-coverage-track",
                 "collapsedHeight": 1,
+                "expandedHeight": 90,
                 "svMode": "matched",
                 "visibleTypes": {
                   "DEL": true,
@@ -176,6 +178,7 @@
                   "variants": [],
                   "matchedIds": []
                 },
+                "expandedHeight": 90,
                 "arcHeightMultiplier": 5.0
               },
               "height": 90,

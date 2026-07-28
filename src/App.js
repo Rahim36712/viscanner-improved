@@ -95,21 +95,33 @@ export function updateHpSvTrackVisibility(showTrack) {
     if (!viewconf || !viewconf.views || !viewconf.views.length) {
       return;
     }
+    const targetHeight = showTrack ? 90 : 1;
     fitToContent({
       resetLocation: showTrack,
       preserveLocation: !showTrack,
       trackOptionsByUid: {
-        "wakhan-hp-sv-track": { showTrack },
+        "wakhan-hp-sv-track": {
+          showTrack,
+          height: targetHeight,
+          expandedHeight: 90,
+          layoutHeight: 90,
+        },
       },
-    }).then(() => {
-      const hpSvTrack = hgc.api.getTrackObject("aa", "wakhan-hp-sv-track");
-      if (hpSvTrack && hpSvTrack.setVisibilityOptions) {
-        hpSvTrack.setVisibilityOptions({ showTrack });
-      }
-      scheduleFitToContent();
-    }).catch((err) => {
-      console.warn("fitToContent caught error silently:", err);
-    });
+    })
+      .then(() => {
+        const hpSvTrack = hgc.api.getTrackObject("aa", "wakhan-hp-sv-track");
+        if (hpSvTrack && hpSvTrack.setVisibilityOptions) {
+          hpSvTrack.setVisibilityOptions({
+            showTrack,
+            height: targetHeight,
+            expandedHeight: 90,
+          });
+        }
+        scheduleFitToContent();
+      })
+      .catch((err) => {
+        console.warn("fitToContent caught error silently:", err);
+      });
   } catch (error) {
     console.warn("Error in updateHpSvTrackVisibility:", error);
     return;
