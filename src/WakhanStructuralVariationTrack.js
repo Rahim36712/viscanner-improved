@@ -102,6 +102,10 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
       this.chromSizes = {};
+      this.hp1Count = 0;
+      this.hp2Count = 0;
+      this.unphasedCount = 0;
+      this.isOnlyUnphased = false;
 
       this.initTrack();
 
@@ -200,6 +204,23 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
           };
         })
         .filter((variant) => isFiniteNumber(variant.startAbs) && isFiniteNumber(variant.endAbs));
+
+      let hp1Count = 0;
+      let hp2Count = 0;
+      let unphasedCount = 0;
+      this.variants.forEach((v) => {
+        if (v.hp === "1") {
+          hp1Count++;
+        } else if (v.hp === "2") {
+          hp2Count++;
+        } else {
+          unphasedCount++;
+        }
+      });
+      this.hp1Count = hp1Count;
+      this.hp2Count = hp2Count;
+      this.unphasedCount = unphasedCount;
+      this.isOnlyUnphased = hp1Count === 0 && hp2Count === 0 && unphasedCount > 0;
 
       this.resetCache();
     }
@@ -340,11 +361,17 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       safeMoveTo(this.axisGraphics, rightAxisX, top, "drawAxes:rightMove");
       safeLineTo(this.axisGraphics, rightAxisX, top + height, "drawAxes:rightLine");
 
-      const axisLabel = this.hpFilter
-        ? `HP-${this.hpFilter} breakpoints`
-        : this.hpLaneMode
-          ? "HP SVs"
-          : "Breakpoints";
+      let axisLabel;
+      if (this.isOnlyUnphased && this.hpFilter === "1") {
+        axisLabel = "Breakpoints";
+      } else if (this.hpFilter) {
+        axisLabel = `HP-${this.hpFilter} breakpoints`;
+      } else if (this.hpLaneMode) {
+        axisLabel = "HP SVs";
+      } else {
+        axisLabel = "Breakpoints";
+      }
+
       this.addText(axisLabel, 20, top + height / 2, {
         rotation: -Math.PI / 2,
         fontSize: "12px",
@@ -396,11 +423,23 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         if (!isValidVariant(variant)) {
           return false;
         }
-        if (this.hpFilter && variant.hp !== this.hpFilter) {
-          return false;
-        }
-        if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
-          return false;
+        if (this.isOnlyUnphased) {
+          if (this.hpFilter === "1") {
+            // Track 1 renders all unphased variants (hp !== "1" and hp !== "2")
+            if (variant.hp === "1" || variant.hp === "2") {
+              return false;
+            }
+          } else if (this.hpFilter === "2") {
+            // Track 2 renders no variants for unphased datasets
+            return false;
+          }
+        } else {
+          if (this.hpFilter && variant.hp !== this.hpFilter) {
+            return false;
+          }
+          if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
+            return false;
+          }
         }
         if (passOnly && variant.filter !== "PASS") {
           return false;

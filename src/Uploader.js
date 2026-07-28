@@ -433,6 +433,18 @@ function updateWakhanStructuralVariationTrack(data) {
   const hgc = window.hgc.current;
   const viewconfCohort = hgc.api.getViewConfig();
 
+  const variants = (data && data.variants) || [];
+  let hp1Count = 0;
+  let hp2Count = 0;
+  let unphasedCount = 0;
+  variants.forEach((v) => {
+    if (!v) return;
+    if (v.hp === "1") hp1Count++;
+    else if (v.hp === "2") hp2Count++;
+    else unphasedCount++;
+  });
+  const isOnlyUnphased = hp1Count === 0 && hp2Count === 0 && unphasedCount > 0;
+
   const wakhanSvTrack = getTrackObject(hgc, "wakhan-sv-track");
   if (wakhanSvTrack) {
     wakhanSvTrack.setData(data || { variants: [], matchedIds: [] });
@@ -447,6 +459,10 @@ function updateWakhanStructuralVariationTrack(data) {
   }
 
   hgc.api.setViewConfig(viewconfCohort);
+
+  if (variants.length > 0 && typeof window.updateHpSvTrackVisibility === "function") {
+    window.updateHpSvTrackVisibility(!isOnlyUnphased);
+  }
 }
 
 function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = []) {

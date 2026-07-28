@@ -84,13 +84,17 @@ function updateCoverageSvVisibility(options) {
   }
 }
 
-function updateHpSvTrackVisibility(showTrack) {
+export function updateHpSvTrackVisibility(showTrack) {
   const hgc = window.hgc && window.hgc.current;
-  if (!hgc || !hgc.api) {
+  if (!hgc || !hgc.api || typeof hgc.api.getViewConfig !== "function") {
     return;
   }
 
   try {
+    const viewconf = hgc.api.getViewConfig();
+    if (!viewconf || !viewconf.views || !viewconf.views.length) {
+      return;
+    }
     fitToContent({
       resetLocation: showTrack,
       preserveLocation: !showTrack,
@@ -103,11 +107,16 @@ function updateHpSvTrackVisibility(showTrack) {
         hpSvTrack.setVisibilityOptions({ showTrack });
       }
       scheduleFitToContent();
+    }).catch((err) => {
+      console.warn("fitToContent caught error silently:", err);
     });
   } catch (error) {
-    console.error("Error in updateHpSvTrackVisibility:", error);
+    console.warn("Error in updateHpSvTrackVisibility:", error);
     return;
   }
+}
+if (typeof window !== "undefined") {
+  window.updateHpSvTrackVisibility = updateHpSvTrackVisibility;
 }
 
 function WakhanVisibilityControls() {
