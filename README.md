@@ -24,7 +24,7 @@
 
 It seamlessly integrates with **HiScanner** outputs and extends support for **WAKHAN** haplotype phasing pipelines alongside **Severus** structural variant calls.
 
-![ViScanner Interface Preview](docs/images/ui_preview.jpg)
+![ViScanner Multi-Track Visualizer](docs/images/tracks_preview.png)
 
 ---
 
@@ -39,7 +39,13 @@ It seamlessly integrates with **HiScanner** outputs and extends support for **WA
 
 ---
 
-## ⚙️ System Architecture & Workflow
+## 🖥️ User Interface & Data Browser
+
+ViScanner features an interactive segment browser paired with live region inspection:
+
+![WAKHAN Segment Browser & Upload Interface](docs/images/table_preview.png)
+
+### System Data Flow
 
 ```mermaid
 flowchart LR
@@ -69,8 +75,6 @@ flowchart LR
         BAFTrack & SVTrack & CoverageTrack & Table --> GUI["Live Interactive Dashboard"]
     end
 ```
-
-![ViScanner Workflow Diagram](docs/images/workflow_diagram.jpg)
 
 ---
 
