@@ -6,6 +6,7 @@ import { ChromosomeInfo } from "higlass/dist/hglib";
 import { format } from "d3-format";
 import Select from "react-select";
 import { scheduleFitToContent } from "./higlassLayout";
+import { LABELS } from "./labelsConfig";
 
 const PAGE_SIZE = 20;
 

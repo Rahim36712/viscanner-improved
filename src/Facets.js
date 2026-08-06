@@ -6,6 +6,7 @@ import { GeneSearchBox } from "./GeneSearchBox";
 import { ChromosomeInfo } from "higlass/dist/hglib";
 import { resetHiglassView, scheduleFitToContent } from "./higlassLayout";
 import { exportSvgAsPdf } from "./pdfExport";
+import { LABELS } from "./labelsConfig";
 // import Select from "react-select";
 
 // import viewConfigClinvar from "./viewConfig.clinvar.json";
@@ -305,7 +306,7 @@ export class Facets extends React.PureComponent {
                 onClick={this.exportDisplay}
               >
                 <i className="icon icon-download icon-sm fas mr-1"></i>
-                Export PDF (vector)
+                {LABELS.exportPdfButton}
               </button>
             </div>
           </div>

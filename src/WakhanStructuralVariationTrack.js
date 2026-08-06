@@ -3,6 +3,7 @@ import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
 import { getPlotBounds, mapTrackX, getGlobalMasterChromBounds } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
+import { LABELS, SV_CONFIG } from "./labelsConfig";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -12,20 +13,13 @@ import {
   logDevSkip,
 } from "./safeRendering";
 
-const TYPE_COLORS = {
-  DEL: "#F27A9A",
-  INV: "#7C83FF",
-  INS: "#D9CB3E",
-  BND: "#8F969E",
-  sBND: "#A9B7BA",
-  DUP: "#74C69D",
-};
+const TYPE_COLORS = SV_CONFIG.TYPE_COLORS;
 
 const AXIS_COLOR = "#3f464d";
 const GRID_COLOR = "#e5e8eb";
 const CHROM_BAND_COLOR = "#e7eaed";
-const ARC_ALPHA = 0.72;
-const MARKER_ALPHA = 0.34;
+const ARC_ALPHA = SV_CONFIG.ARC_ALPHA;
+const MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
 const DEFAULT_VISIBLE_TYPES = {
   DEL: true,
   INV: true,
@@ -363,13 +357,17 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
       let axisLabel;
       if (this.isOnlyUnphased && this.hpFilter === "1") {
-        axisLabel = "Breakpoints";
+        axisLabel = LABELS.tracks.unphasedBreakpoints;
+      } else if (this.hpFilter === "1") {
+        axisLabel = LABELS.tracks.hp1Breakpoints;
+      } else if (this.hpFilter === "2") {
+        axisLabel = LABELS.tracks.hp2Breakpoints;
       } else if (this.hpFilter) {
         axisLabel = `HP-${this.hpFilter} breakpoints`;
       } else if (this.hpLaneMode) {
-        axisLabel = "HP SVs";
+        axisLabel = LABELS.tracks.hpSvs;
       } else {
-        axisLabel = "Breakpoints";
+        axisLabel = LABELS.tracks.unphasedBreakpoints;
       }
 
       this.addText(axisLabel, 20, top + height / 2, {
@@ -378,14 +376,14 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       });
       if (this.hpLaneMode) {
         if (!this.hpFilter || this.hpFilter === "1") {
-          this.addText("HP-1", rightAxisX + 10, top + 15, {
+          this.addText(LABELS.tracks.hp1Label, rightAxisX + 10, top + 15, {
             anchorX: 0,
             fill: TYPE_COLORS.DEL,
             fontSize: "12px",
           });
         }
         if (!this.hpFilter || this.hpFilter === "2") {
-          this.addText("HP-2", rightAxisX + 10, top + height - 15, {
+          this.addText(LABELS.tracks.hp2Label, rightAxisX + 10, top + height - 15, {
             anchorX: 0,
             fill: "#2D7DD2",
             fontSize: "12px",
@@ -552,7 +550,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       }
 
       const steps = span > 280 ? 30 : 22;
-      this.variantGraphics.lineStyle(1.25, color, ARC_ALPHA);
+      this.variantGraphics.lineStyle(SV_CONFIG.ARC_LINE_WIDTH, color, ARC_ALPHA);
 
       for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
@@ -645,7 +643,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         return;
       }
 
-      this.variantGraphics.lineStyle(1, color, MARKER_ALPHA);
+      this.variantGraphics.lineStyle(SV_CONFIG.MARKER_LINE_WIDTH, color, MARKER_ALPHA);
       safeMoveTo(this.variantGraphics, x, markerTop, "drawMarker:moveTo");
       safeLineTo(this.variantGraphics, x, markerBottom, "drawMarker:lineTo");
 

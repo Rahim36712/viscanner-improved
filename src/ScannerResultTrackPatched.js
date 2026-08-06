@@ -7,6 +7,7 @@ import {
   getDynamicChrAbs,
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
+import { LABELS } from "./labelsConfig";
 
 const CHROM_BAND_COLOR = "#e7eaed";
 const BAF_COLOR = "#9A9D32";
@@ -413,9 +414,9 @@ function ScannerResultTrackPatched(HGC, ...args) {
         : "-";
 
       return `<table style="margin-top:3px;border:1px solid #333333;">
-        <tr><td style="font-weight:bold;">Position</td><td>${posStr}</td></tr>
+        <tr><td style="font-weight:bold;">${LABELS.tooltips.position}</td><td>${posStr}</td></tr>
         <tr><td style="font-weight:bold;">Value (${isBafTrack ? "BAF" : "RDR"})</td><td>${formatBafValue(segHit.yvalue)}</td></tr>
-        <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(segHit.total_cn ?? segHit.copyNumber ?? segHit.yvalue)}</td></tr>
+        <tr><td style="font-weight:bold;">${LABELS.tooltips.bedCopyNumber}</td><td>${formatCopyNumber(segHit.total_cn ?? segHit.copyNumber ?? segHit.yvalue)}</td></tr>
       </table>`;
     }
 

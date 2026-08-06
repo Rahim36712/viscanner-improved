@@ -5,6 +5,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
 import { fitToContent, scheduleFitToContent } from "./higlassLayout";
+import { LABELS, SV_CONFIG } from "./labelsConfig";
 
 const DEFAULT_WAKHAN_VISIBILITY = {
   showHp1: true,
@@ -12,14 +13,11 @@ const DEFAULT_WAKHAN_VISIBILITY = {
   showCoverage: true,
 };
 
-const SV_TYPE_OPTIONS = [
-  { key: "DEL", label: "DEL", color: "#F27A9A" },
-  { key: "INV", label: "INV", color: "#7C83FF" },
-  { key: "INS", label: "INS", color: "#D9CB3E" },
-  { key: "BND", label: "BND", color: "#8F969E" },
-  { key: "DUP", label: "DUP", color: "#74C69D" },
-  { key: "sBND", label: "sBND", color: "#A9B7BA" },
-];
+const SV_TYPE_OPTIONS = Object.keys(SV_CONFIG.TYPE_COLORS).map((key) => ({
+  key,
+  label: key,
+  color: SV_CONFIG.TYPE_COLORS[key],
+}));
 
 const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
   visibility[option.key] = true;
@@ -147,14 +145,14 @@ function WakhanVisibilityControls() {
 
   return (
     <div className="wakhan-visibility border p-2 mt-3">
-      <div className="wakhan-visibility-title">WAKHAN visibility</div>
+      <div className="wakhan-visibility-title">{LABELS.wakhanVisibility.panelTitle}</div>
       <label className="wakhan-visibility-option">
         <input
           type="checkbox"
           checked={visibility.showHp1}
           onChange={() => toggleVisibility("showHp1")}
         />
-        <span>HP1 plot</span>
+        <span>{LABELS.wakhanVisibility.hp1Plot}</span>
       </label>
       <label className="wakhan-visibility-option">
         <input
@@ -162,7 +160,7 @@ function WakhanVisibilityControls() {
           checked={visibility.showHp2}
           onChange={() => toggleVisibility("showHp2")}
         />
-        <span>HP2 plot</span>
+        <span>{LABELS.wakhanVisibility.hp2Plot}</span>
       </label>
       <label className="wakhan-visibility-option">
         <input
@@ -170,7 +168,7 @@ function WakhanVisibilityControls() {
           checked={visibility.showCoverage}
           onChange={() => toggleVisibility("showCoverage")}
         />
-        <span>Coverage points</span>
+        <span>{LABELS.wakhanVisibility.coveragePoints}</span>
       </label>
     </div>
   );
@@ -225,9 +223,9 @@ function SvVisibilityControls() {
 
   return (
     <div className="wakhan-visibility border p-2 mt-3">
-      <div className="wakhan-visibility-title">SV visibility</div>
+      <div className="wakhan-visibility-title">{LABELS.svVisibility.panelTitle}</div>
       <div className="sv-control-section">
-        <div className="sv-control-section-title">SV source</div>
+        <div className="sv-control-section-title">{LABELS.svVisibility.sourceTitle}</div>
         <label className="wakhan-visibility-option">
           <input
             type="radio"
@@ -235,7 +233,7 @@ function SvVisibilityControls() {
             checked={svMode === "matched"}
             onChange={() => setSvMode("matched")}
           />
-          <span>BED-matched SVs</span>
+          <span>{LABELS.svVisibility.bedMatchedSvs}</span>
         </label>
         <label className="wakhan-visibility-option">
           <input
@@ -244,18 +242,18 @@ function SvVisibilityControls() {
             checked={svMode === "all"}
             onChange={() => setSvMode("all")}
           />
-          <span>All VCF SVs</span>
+          <span>{LABELS.svVisibility.allVcfSvs}</span>
         </label>
       </div>
       <div className="sv-control-section">
-        <div className="sv-control-section-title">SV displays</div>
+        <div className="sv-control-section-title">{LABELS.svVisibility.displaysTitle}</div>
         <label className="wakhan-visibility-option">
           <input
             type="checkbox"
             checked={showHpSvTrack}
             onChange={() => setShowHpSvTrack((current) => !current)}
           />
-          <span>HP2 SV plot</span>
+          <span>{LABELS.svVisibility.hp2SvPlot}</span>
         </label>
         <label className="wakhan-visibility-option">
           <input
@@ -263,7 +261,7 @@ function SvVisibilityControls() {
             checked={showSvLinesInCopyNumber}
             onChange={() => setShowSvLinesInCopyNumber((current) => !current)}
           />
-          <span>SV lines in copy-number plot</span>
+          <span>{LABELS.svVisibility.svLinesInCopyNumber}</span>
         </label>
         <label className="wakhan-visibility-option">
           <input
@@ -271,11 +269,11 @@ function SvVisibilityControls() {
             checked={showMaskedRegions}
             onChange={() => setShowMaskedRegions((current) => !current)}
           />
-          <span>Masked regions in copy-number plot</span>
+          <span>{LABELS.svVisibility.maskedRegionsInCopyNumber}</span>
         </label>
       </div>
       <div className="sv-control-section">
-        <div className="sv-control-section-title">SV types</div>
+        <div className="sv-control-section-title">{LABELS.svVisibility.typesTitle}</div>
       {SV_TYPE_OPTIONS.map((option) => (
         <label className="wakhan-visibility-option sv-visibility-option" key={option.key}>
           <input
@@ -292,7 +290,7 @@ function SvVisibilityControls() {
       ))}
       </div>
       <div className="sv-control-section">
-        <div className="sv-control-section-title">SV min span</div>
+        <div className="sv-control-section-title">{LABELS.svVisibility.minSpanTitle}</div>
         <div className="sv-max-span-input">
           <input
             type="number"
@@ -303,9 +301,9 @@ function SvVisibilityControls() {
             step="10000"
             placeholder="e.g. 50000"
           />
-          <span className="sv-max-span-unit">bp</span>
+          <span className="sv-max-span-unit">{LABELS.svVisibility.minSpanUnit}</span>
         </div>
-        <div className="sv-max-span-hint">0 or empty = no limit</div>
+        <div className="sv-max-span-hint">{LABELS.svVisibility.minSpanHint}</div>
       </div>
     </div>
   );
@@ -314,27 +312,18 @@ function SvVisibilityControls() {
 function App() {
   return (
     <div className="App">
-      {/* <div className="container">
-        <div className="row">
-          <div className="col">
-            <h1 className="my-5">Scanner output visualization</h1>
-            <Uploader></Uploader>
-          </div>
-        </div>
-      </div> */}
-
       <div id="overlay">
         <div id="overlay-text"><i className="fas fa fa-spin fa-spinner mr-1"></i>Loading data</div>
       </div>
 
       <div className="container-fluid px-4 mt-5">
         <h2 id="variant-view" className="text-center">
-          HiScanner output visualization
+          {LABELS.appTitle}
         </h2>
         <CnvTable />
 
         <div className="h3 mt-5" id="sec:visualization">
-          Interactive visualization
+          {LABELS.visualizationSectionTitle}
         </div>
         <div className="row mt-4">
           <div className="col-md-3 ">
@@ -354,8 +343,8 @@ function App() {
       </div>
       <div className="container-fluid bg-light mt-5 py-4 text-center">
         <div className="mb-1">
-          For support or questions, please open an issue on our{" "}
-          <a href="https://github.com/parklab/hiscanner">GitHub repository</a>.
+          {LABELS.footer.supportText}
+          <a href={LABELS.footer.githubUrl}>{LABELS.footer.githubLinkText}</a>.
         </div>
       </div>
     </div>

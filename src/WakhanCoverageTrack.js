@@ -10,6 +10,7 @@ import {
   getDynamicChrAbs,
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
+import { LABELS, SV_CONFIG } from "./labelsConfig";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -33,7 +34,7 @@ const MASKED_REGION_BORDER_COLOR = "#B58A2A";
 const MASKED_REGION_BORDER_ALPHA = 0.7;
 const COVERAGE_DOT_SIZE = 1.6;
 const COVERAGE_TICK_STEP = 30;
-const SV_MARKER_ALPHA = 0.34;
+const SV_MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
 const DEFAULT_SV_MODE = "matched";
 const DEFAULT_VISIBLE_TYPES = {
   DEL: true,
@@ -43,14 +44,7 @@ const DEFAULT_VISIBLE_TYPES = {
   DUP: true,
   sBND: true,
 };
-const SV_TYPE_COLORS = {
-  DEL: "#F27A9A",
-  INV: "#7C83FF",
-  INS: "#D9CB3E",
-  BND: "#8F969E",
-  sBND: "#A9B7BA",
-  DUP: "#74C69D",
-};
+const SV_TYPE_COLORS = SV_CONFIG.TYPE_COLORS;
 
 function clampCoverage(value, coverageMax) {
   if (!isFiniteNumber(value) || !isFiniteNumber(coverageMax) || coverageMax <= 0) {
@@ -668,23 +662,23 @@ function WakhanCoverageTrack(HGC, ...args) {
       safeMoveTo(this.axisGraphics, rightAxisX, top, "drawAxes:rightMove");
       safeLineTo(this.axisGraphics, rightAxisX, bottomY, "drawAxes:rightLine");
 
-      this.addText("Coverage depth", 20, centerY, {
+      this.addText(LABELS.tracks.coverageDepth, 20, centerY, {
         rotation: -Math.PI / 2,
         fontSize: "12px",
       });
-      this.addText("Copy number", width - 18, centerY, {
+      this.addText(LABELS.tracks.phasedCopyNumber, width - 18, centerY, {
         rotation: Math.PI / 2,
         fontSize: "12px",
       });
       if (this.showHp1) {
-        this.addText("HP-1", rightAxisX + 26, top + 12, {
+        this.addText(LABELS.tracks.hp1Label, rightAxisX + 26, top + 12, {
           anchorX: 0,
           fill: HP1_COLOR,
           fontSize: "12px",
         });
       }
       if (this.showHp2) {
-        this.addText("HP-2", rightAxisX + 26, bottomY - 12, {
+        this.addText(LABELS.tracks.hp2Label, rightAxisX + 26, bottomY - 12, {
           anchorX: 0,
           fill: HP2_COLOR,
           fontSize: "12px",
