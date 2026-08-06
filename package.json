@@ -54,8 +54,7 @@
   "scripts": {
     "start": "webpack serve --mode development",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && webpack --mode production",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "node scripts/deploy.js"
   },
   "eslintConfig": {
     "extends": [
