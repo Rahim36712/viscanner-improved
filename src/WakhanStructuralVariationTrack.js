@@ -30,11 +30,11 @@ const DEFAULT_VISIBLE_TYPES = {
 };
 const DEFAULT_SV_MODE = "matched";
 
-function normalizeHpFilter(value) {
+export function normalizeHpFilter(value) {
   return value === "1" || value === "2" ? value : null;
 }
 
-function normalizeTrackData(data) {
+export function normalizeTrackData(data) {
   if (Array.isArray(data)) {
     return { variants: data, matchedIds: [] };
   }
@@ -44,7 +44,7 @@ function normalizeTrackData(data) {
   };
 }
 
-function variantLength(variant) {
+export function variantLength(variant) {
   if (isFiniteNumber(variant?.svlen)) {
     return Math.abs(variant.svlen);
   }
@@ -66,7 +66,7 @@ function sampleRows(rows, maxRows) {
   return sampled;
 }
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return String(value === undefined || value === null ? "-" : value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -92,6 +92,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
       };
+      this.options.visibleTypes = { ...this.visibleTypes };
       this.maxVariantLength = this.options.maxVariantLength || null;
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
@@ -152,21 +153,31 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     setVisibilityOptions(options = {}) {
-      this.visibleTypes = {
-        ...this.visibleTypes,
-        ...(options.visibleTypes || {}),
-      };
+      if (options.visibleTypes) {
+        this.visibleTypes = {
+          ...this.visibleTypes,
+          ...options.visibleTypes,
+        };
+        this.options.visibleTypes = {
+          ...(this.options.visibleTypes || {}),
+          ...this.visibleTypes,
+        };
+      }
       if (options.svMode) {
         this.svMode = options.svMode;
+        this.options.svMode = options.svMode;
       }
       if (options.showTrack !== undefined) {
         this.showTrack = options.showTrack !== false;
+        this.options.showTrack = this.showTrack;
       }
       if (options.hpFilter !== undefined) {
         this.hpFilter = normalizeHpFilter(options.hpFilter);
+        this.options.hpFilter = this.hpFilter;
       }
       if (options.maxVariantLength !== undefined) {
         this.maxVariantLength = options.maxVariantLength || null;
+        this.options.maxVariantLength = this.maxVariantLength;
       }
       this.resetCache();
       this.updateExistingGraphics();
@@ -231,7 +242,8 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
     rerender(options) {
       super.rerender(options);
-      this.options = options;
+      const currentActiveTypes = this.visibleTypes ? { ...this.visibleTypes } : null;
+      this.options = options || this.options || {};
       this.svMode = this.svMode || this.options.svMode || DEFAULT_SV_MODE;
       this.showTrack = this.showTrack === undefined ? this.options.showTrack !== false : this.showTrack;
       this.hpLaneMode = this.options.hpLaneMode === true;
@@ -239,9 +251,10 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         this.hpFilter === undefined ? normalizeHpFilter(this.options.hpFilter) : this.hpFilter;
       this.visibleTypes = {
         ...DEFAULT_VISIBLE_TYPES,
-        ...this.visibleTypes,
         ...(this.options.visibleTypes || {}),
+        ...(currentActiveTypes || {}),
       };
+      this.options.visibleTypes = { ...this.visibleTypes };
       if (this.rawData && !this.variants.length) {
         this.parseData(this.rawData);
       }
@@ -734,12 +747,15 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     getMouseOverHtml(trackX, trackY) {
-      if (!isFiniteNumber(trackX) || !isFiniteNumber(trackY)) {
+      if (!isFiniteNumber(trackX) || !isFiniteNumber(trackY) || !this.showTrack) {
         return "";
       }
 
       const hits = this.hitRegions
         .map((region) => {
+          if (!region || !region.variant || this.visibleTypes[region.variant.type] === false) {
+            return null;
+          }
           if (region.kind === "marker") {
             if (Math.abs(trackX - region.x) <= 6 && trackY >= region.top && trackY <= region.bottom + 4) {
               return {
@@ -775,7 +791,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
 
       const hit = hits.length ? hits[0].region : null;
 
-      if (!hit) {
+      if (!hit || !hit.variant || this.visibleTypes[hit.variant.type] === false) {
         return "";
       }
 

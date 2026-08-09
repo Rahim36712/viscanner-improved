@@ -10,9 +10,9 @@ async function decompressBlob(blob) {
   return await new Response(decompressedStream).text();
 }
 
-const RAR_SIGNATURE = "526172211A07";
+export const RAR_SIGNATURE = "526172211A07";
 
-function normalizeChromosome(chrom) {
+export function normalizeChromosome(chrom) {
   return chrom.startsWith("chr") ? chrom : "chr" + chrom;
 }
 
@@ -21,14 +21,14 @@ function fileBaseName(filename) {
   return parts[parts.length - 1];
 }
 
-async function fileSignature(file) {
+export async function fileSignature(file) {
   const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
   return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
     .join("");
 }
 
-function parseHiglassData(v) {
+export function parseHiglassData(v) {
   const result = v.trim().split(/\r?\n/);
   const higlassData = [];
   result.forEach((r, i) => {
@@ -68,7 +68,7 @@ function dataForHaplotypeCopyNumberTrack(data, copyNumberIndex) {
   });
 }
 
-function parseSnpData(v, delimiter = "\t") {
+export function parseSnpData(v, delimiter = "\t") {
   const result = v.trim().split(/\r?\n/);
   const higlassData = [];
   result.forEach((r, i) => {
@@ -78,7 +78,7 @@ function parseSnpData(v, delimiter = "\t") {
     const segment = r.split(delimiter);
     const pos = parseInt(segment[1], 10);
     const value = parseFloat(segment[2]);
-    if (i === 0 && (Number.isNaN(pos) || Number.isNaN(value))) {
+    if (Number.isNaN(pos) || Number.isNaN(value)) {
       return;
     }
     const chr = normalizeChromosome(segment[0]);
@@ -120,7 +120,7 @@ function parseSampleField(formatText, sampleText) {
   return sample;
 }
 
-function parseBreakendAlt(alt) {
+export function parseBreakendAlt(alt) {
   const match = alt && alt.match(/[\[\]]([^:\[\]]+):(\d+)[\[\]]/);
   if (!match) {
     return null;
@@ -145,7 +145,7 @@ function parseBreakpointIds(value) {
   );
 }
 
-function parseSeverusVcf(v, options = {}) {
+export function parseSeverusVcf(v, options = {}) {
   const passOnly = options.passOnly !== false;
   const rawRecords = [];
   const recordsById = new Map();
@@ -228,7 +228,7 @@ function parseSeverusVcf(v, options = {}) {
     .filter(Boolean);
 }
 
-function parseWakhanCoverageData(v) {
+export function parseWakhanCoverageData(v) {
   const rows = [];
   v.trim()
     .split(/\r?\n/)
@@ -250,7 +250,7 @@ function parseWakhanCoverageData(v) {
   return rows;
 }
 
-function parseMaskedRegionBed(v) {
+export function parseMaskedRegionBed(v) {
   const rows = [];
   v.trim()
     .split(/\r?\n/)
@@ -274,7 +274,7 @@ function parseMaskedRegionBed(v) {
   return rows;
 }
 
-function parseWakhanSegmentBed(v, haplotypeKey) {
+export function parseWakhanSegmentBed(v, haplotypeKey) {
   const rows = [];
   v.trim()
     .split(/\r?\n/)
@@ -308,7 +308,7 @@ function parseWakhanMatchedSvIds(...segmentGroups) {
   return Array.from(ids);
 }
 
-function parseWakhanSegmentTableData(hp1Segments, hp2Segments) {
+export function parseWakhanSegmentTableData(hp1Segments, hp2Segments) {
   const rowsByRegion = new Map();
   const addRows = (rows, haplotypeKey) => {
     rows.forEach((row) => {
@@ -344,7 +344,7 @@ function parseWakhanSegmentTableData(hp1Segments, hp2Segments) {
   );
 }
 
-function parseWakhanCopyNumberData(hp1Text, hp2Text) {
+export function parseWakhanCopyNumberData(hp1Text, hp2Text) {
   const rowsByRegion = new Map();
   const addRows = (rows, haplotypeKey) => {
     rows.forEach((row) => {

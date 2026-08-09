@@ -282,6 +282,7 @@ function WakhanCoverageTrack(HGC, ...args) {
         ...DEFAULT_VISIBLE_TYPES,
         ...(this.options.visibleTypes || {}),
       };
+      this.options.visibleTypes = { ...this.visibleSvTypes };
       this.maxVariantLength = this.options.maxVariantLength || null;
       this.previousFromX = Number.MIN_SAFE_INTEGER;
       this.previousToX = Number.MAX_SAFE_INTEGER;
@@ -357,30 +358,41 @@ function WakhanCoverageTrack(HGC, ...args) {
     setVisibilityOptions(options = {}) {
       if (options.showHp1 !== undefined) {
         this.showHp1 = options.showHp1 !== false;
+        this.options.showHp1 = this.showHp1;
       }
       if (options.showHp2 !== undefined) {
         this.showHp2 = options.showHp2 !== false;
+        this.options.showHp2 = this.showHp2;
       }
       if (options.showCoverage !== undefined) {
         this.showCoverage = options.showCoverage !== false;
+        this.options.showCoverage = this.showCoverage;
       }
       if (options.showSvBreakpoints !== undefined) {
         this.showSvBreakpoints = options.showSvBreakpoints !== false;
+        this.options.showSvBreakpoints = this.showSvBreakpoints;
       }
       if (options.showMaskedRegions !== undefined) {
         this.showMaskedRegions = options.showMaskedRegions === true;
+        this.options.showMaskedRegions = this.showMaskedRegions;
       }
       if (options.svMode) {
         this.svMode = options.svMode;
+        this.options.svMode = options.svMode;
       }
       if (options.visibleTypes) {
         this.visibleSvTypes = {
           ...this.visibleSvTypes,
           ...options.visibleTypes,
         };
+        this.options.visibleTypes = {
+          ...(this.options.visibleTypes || {}),
+          ...this.visibleSvTypes,
+        };
       }
       if (options.maxVariantLength !== undefined) {
         this.maxVariantLength = options.maxVariantLength || null;
+        this.options.maxVariantLength = this.maxVariantLength;
       }
       this.resetCache();
       this.updateExistingGraphics();
@@ -522,7 +534,8 @@ function WakhanCoverageTrack(HGC, ...args) {
 
     rerender(options) {
       super.rerender(options);
-      this.options = options;
+      const currentActiveTypes = this.visibleSvTypes ? { ...this.visibleSvTypes } : null;
+      this.options = options || this.options || {};
       this.showHp1 = this.showHp1 === undefined ? this.options.showHp1 !== false : this.showHp1;
       this.showHp2 = this.showHp2 === undefined ? this.options.showHp2 !== false : this.showHp2;
       this.showCoverage = this.showCoverage === undefined ? this.options.showCoverage !== false : this.showCoverage;
@@ -531,9 +544,10 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.svMode = this.svMode || this.options.svMode || DEFAULT_SV_MODE;
       this.visibleSvTypes = {
         ...DEFAULT_VISIBLE_TYPES,
-        ...this.visibleSvTypes,
         ...(this.options.visibleTypes || {}),
+        ...(currentActiveTypes || {}),
       };
+      this.options.visibleTypes = { ...this.visibleSvTypes };
       if (this.options.data && !this.coverage.length) {
         this.parseData(this.options.data);
       }
@@ -1165,7 +1179,16 @@ function WakhanCoverageTrack(HGC, ...args) {
 
       const svHit = (this.svHitRegions || [])
         .map((region) => {
-          if (region && Math.abs(trackX - region.x) <= 5 && trackY >= region.top && trackY <= region.bottom) {
+          if (
+            region &&
+            region.marker &&
+            region.marker.variant &&
+            this.showSvBreakpoints &&
+            this.visibleSvTypes[region.marker.variant.type] !== false &&
+            Math.abs(trackX - region.x) <= 5 &&
+            trackY >= region.top &&
+            trackY <= region.bottom
+          ) {
             return { region, distance: Math.abs(trackX - region.x) };
           }
           return null;

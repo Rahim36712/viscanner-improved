@@ -83,7 +83,6 @@ export class CnvTable extends React.PureComponent {
     if(this.state.sortedBy === value && sortedByOrder === "asc"){
       // Reverse sort
       console.log("reverse")
-      displayedVariants.reverse();
       sortedByOrder = "desc";
     }
     else{
@@ -95,6 +94,25 @@ export class CnvTable extends React.PureComponent {
       sortedBy: value,
       sortedByOrder: sortedByOrder
     });
+  };
+
+  exportCsv = () => {
+    if (!this.state.displayedVariants || this.state.displayedVariants.length === 0) return;
+    const variants = this.state.displayedVariants;
+    const keys = Object.keys(variants[0]);
+    const header = keys.join(",");
+    const rows = variants.map((v) =>
+      keys.map((k) => JSON.stringify(v[k] !== undefined && v[k] !== null ? v[k] : "")).join(",")
+    );
+    const csvContent = [header, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${this.state.tableType}_cnv_segments.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   selectChrom = (selectedChrom) => {
@@ -427,6 +445,14 @@ export class CnvTable extends React.PureComponent {
 
         <div className="d-flex flex-row-reverse mb-2">
           {navButtons}
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm mx-2"
+            onClick={this.exportCsv}
+          >
+            <i className="fa fa-download fas mr-1"></i>
+            {LABELS.cnvTable.exportCsvButton}
+          </button>
           <div className="pt-1 mx-2">{message}</div>
         </div>
         <div className="row">

@@ -93,23 +93,23 @@ export const SV_CONFIG = {
    * Vibrant, bold, high-contrast colors for Structural Variations.
    */
   TYPE_COLORS: {
-    DEL: "#D90429",   // Bold Crimson / Deep Vivid Red
-    INV: "#3A0CA3",   // Vivid Royal Indigo / Deep Blue
-    INS: "#B58403",   // Rich Golden Amber
-    BND: "#212529",   // Dark Slate Charcoal / Black Graphite
-    DUP: "#15803D",   // Rich Emerald Forest Green
-    sBND: "#0D9488",  // Dark Teal Slate
+    DEL: "#ff002b",   // Bold Crimson / Deep Vivid Red
+    INV: "#00c3ff",   // Vivid Sky Blue / Electric Cyan
+    INS: "#fb00ff",   // Vivid Magenta / Neon Pink
+    BND: "#212529",   // Near-Black / Dark Graphite
+    DUP: "#ffaf01",   // Bright Amber / Golden Yellow
+    sBND: "#00ffea",  // Bright Aqua / Neon Turquoise
   },
 
   /**
    * Arc curve line width and opacity settings.
    */
-  ARC_LINE_WIDTH: 2.5,   // Thick, crisp, highly visible arc lines (default was 1.25)
-  ARC_ALPHA: 0.90,        // Solid crisp opacity (default was 0.72)
+  ARC_LINE_WIDTH: 1.15,   // Thick, crisp, highly visible arc lines (default was 1.25)
+  ARC_ALPHA: 0.72,        // Solid crisp opacity (default was 0.72)
   
   /**
    * Marker line width and opacity settings.
    */
-  MARKER_LINE_WIDTH: 2.0, // Vertical breakpoint marker width (default was 1.0)
-  MARKER_ALPHA: 0.65,     // Opacity for breakpoint vertical lines (default was 0.34)
+  MARKER_LINE_WIDTH: 1.0, // Vertical breakpoint marker width (default was 1.0)
+  MARKER_ALPHA: 0.34,     // Opacity for breakpoint vertical lines (default was 0.34)
 };
