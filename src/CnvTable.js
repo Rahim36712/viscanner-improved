@@ -6,7 +6,7 @@ import { ChromosomeInfo } from "higlass/dist/hglib";
 import { format } from "d3-format";
 import Select from "react-select";
 import { scheduleFitToContent } from "./higlassLayout";
-import { LABELS } from "./labelsConfig";
+import { LABELS, UI_COLORS } from "./labelsConfig";
 
 const PAGE_SIZE = 20;
 
@@ -397,7 +397,7 @@ export class CnvTable extends React.PureComponent {
     ) {
       navButtons.push(
         <button className="btn btn-primary btn-sm" onClick={this.nextPage}>
-          Next
+          {LABELS.cnvTable.nextButton}
         </button>
       );
     }
@@ -408,7 +408,7 @@ export class CnvTable extends React.PureComponent {
           className="btn btn-primary btn-sm mx-2"
           onClick={this.previousPage}
         >
-          Previous
+          {LABELS.cnvTable.previousButton}
         </button>
       );
     }
@@ -428,11 +428,11 @@ export class CnvTable extends React.PureComponent {
         <div className="row mt-4 mb-5">
           <div className="col-12 ">
             <div className="text-center">
-              <div className="my-1">
-                HiScanner visualization output file (required)
+              <div className="my-1" style={{ color: UI_COLORS.uploaderTitleColor }}>
+                {LABELS.uploader.title}
               </div>
-              <div className="small text-muted mb-1">
-                Include grch38.cen_coord.curated.bed to show masked regions
+              <div className="small mb-1" style={{ color: UI_COLORS.uploaderSubtitleColor }}>
+                {LABELS.uploader.subtitle}
               </div>
               <Uploader populateTable={(d) => this.populateTable(d)} />
             </div>
@@ -440,7 +440,7 @@ export class CnvTable extends React.PureComponent {
         </div>
 
         <div className="h3">
-          {this.state.tableType === "wakhan" ? "WAKHAN segment browser" : "Variant browser"}
+          {this.state.tableType === "wakhan" ? LABELS.cnvTable.wakhanTitle : LABELS.cnvTable.variantTitle}
         </div>
 
         <div className="d-flex flex-row-reverse mb-2">

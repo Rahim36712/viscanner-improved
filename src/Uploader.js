@@ -3,6 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
 import { scheduleFitToContent } from "./higlassLayout";
 import { registerDatasetExtents } from "./plotBounds";
+import { LABELS, UI_COLORS } from "./labelsConfig";
 
 async function decompressBlob(blob) {
   let ds = new DecompressionStream("gzip");
@@ -742,7 +743,6 @@ const Uploader = (props) => {
 
   const style = useMemo(
     () => ({
-      ///...baseStyle,
       ...(isFocused ? focusedStyle : {}),
       ...(isDragAccept ? acceptStyle : {}),
       ...(isDragReject ? rejectStyle : {}),
@@ -754,12 +754,12 @@ const Uploader = (props) => {
     <div className="d-inline-block">
       <div {...getRootProps({ style })}>
         <input {...getInputProps()} />
-        <button className="btn btn-outline-primary ">
+        <button className="btn btn-outline-primary" style={{ color: UI_COLORS.uploaderButtonText, borderColor: UI_COLORS.uploaderButtonBorder }}>
           <i
             id="upload-spinner"
             className="fas fa fa-spinner fa-spin mr-1 collapse"
           ></i>
-          Click to upload
+          {LABELS.uploader.buttonText}
         </button>
       </div>
     </div>
@@ -767,49 +767,3 @@ const Uploader = (props) => {
 };
 
 export default Uploader;
-
-// import "react-dropzone-uploader/dist/styles.css";
-// import Dropzone from "react-dropzone-uploader";
-// import React from "react";
-
-// // var fileReaderStream = require('filereader-stream')
-// // window.Buffer = window.Buffer || require("buffer").Buffer;
-// // window.process = {}
-
-// async function decompressBlob(blob) {
-//   let ds = new DecompressionStream("gzip");
-//   let decompressedStream = blob.stream().pipeThrough(ds);
-//   return await new Response(decompressedStream).text();
-// }
-
-// const Uploader = () => {
-//   // specify upload params and url for your files
-//   const getUploadParams = ({ meta }) => {
-//     return { url: "https://httpbin.org/post" };
-//   };
-
-//   // called every time a file's `status` changes
-//   const handleChangeStatus = ({ meta, file }, status) => {
-//     console.log(status, meta, file);
-//     if (status === "done") {
-//       decompressBlob(file).then((v) => console.log(v));
-//     }
-//   };
-
-//   // receives array of files that are done uploading when submit button is clicked
-//   const handleSubmit = (files, allFiles) => {
-//     //console.log(files.map(f => f.meta))
-//     console.log(files);
-//     //allFiles.forEach(f => f.remove())
-//   };
-
-//   return (
-//     <Dropzone
-//       getUploadParams={getUploadParams}
-//       onChangeStatus={handleChangeStatus}
-//       onSubmit={handleSubmit}
-//     />
-//   );
-// };
-
-// export default Uploader;

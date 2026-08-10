@@ -1,17 +1,35 @@
 /**
  * labelsConfig.js
  * 
- * Centralized Configuration for ViScanner / HiScanner UI Labels & Structural Variation (SV) Styling.
+ * Centralized Configuration for ViScanner / HiScanner UI Labels & Visual Styling (Colors).
  * 
- * To customize any text on the website or change structural variation colors/arc thickness,
+ * To customize any text on the website or change colors, arc thickness, etc.
  * simply edit the values in this file!
  */
 
 export const LABELS = {
   // Main Navigation / Header
-  appTitle: "HiScanner output visualization",
+  appTitle: "HiScanner [Wakhan] visualization",
   visualizationSectionTitle: "Interactive visualization",
   exportPdfButton: "Export PDF",
+  loadingOverlay: "Loading data",
+
+  // File Upload Section
+  uploader: {
+    title: "Wakhan Compressed Output files (required)",
+    subtitle: "Include grch38.cen_coord.curated.bed to show masked regions",
+    buttonText: "Click to upload",
+  },
+
+  // Facets / Navigation Section
+  facets: {
+    navigationTitle: "NAVIGATION",
+    goToRegionLabel: "Go to specific region",
+    goToRegionPlaceholder: "e.g., chr2:1000-chr2:2000",
+    goButton: "Go",
+    goToGeneLabel: "Go to specific gene",
+    resetViewButton: "Reset View",
+  },
 
   // WAKHAN Track Visibility Controls (Left Panel)
   wakhanVisibility: {
@@ -52,10 +70,14 @@ export const LABELS = {
     hp2Label: "HP-2",
   },
 
-  // Somatic CNV Table
+  // Somatic CNV & Variant Table
   cnvTable: {
-    title: "Somatic Structural Variations & Copy Number Table",
+    somaticTitle: "Somatic Structural Variations & Copy Number Table",
+    wakhanTitle: "WAKHAN segment browser",
+    variantTitle: "Variant browser",
     exportCsvButton: "Export CSV",
+    previousButton: "Previous",
+    nextButton: "Next",
     searchPlaceholder: "Search by Chr, Pos, Type, ID...",
     noDataText: "No variants or copy-number segments found.",
     columns: {
@@ -79,6 +101,8 @@ export const LABELS = {
     cnEquivalent: "Copy-number equivalent",
     bedCopyNumber: "BED copy number",
     bedSegmentCoverage: "BED segment coverage",
+    lohRegion: "LOH Region",
+    centromereMaskedRegion: "Masked Centromere Region",
   },
 
   // Footer
@@ -89,28 +113,67 @@ export const LABELS = {
   },
 };
 
+/**
+ * Centralized UI Element & Theme Colors.
+ */
+export const UI_COLORS = {
+  // Page Title & Header Colors
+  appTitleColor: "#212529",
+  visualizationSectionTitleColor: "#212529",
+
+  // Uploader UI Colors
+  uploaderTitleColor: "#212529",
+  uploaderSubtitleColor: "#6c757d",
+  uploaderButtonText: "#0d6efd",
+  uploaderButtonBorder: "#0d6efd",
+};
+
+/**
+ * Centralized Visual Styling & Colors for Genome Tracks, Haplotypes, and Regions.
+ */
+export const TRACK_COLORS = {
+  // Haplotype Copy Number & Coverage Colors
+  hp1: "#B23A48",           // Dark Red / Crimson for Haplotype 1
+  hp1Point: "#D95F65",      // Light Red for HP1 coverage points
+  hp2: "#2D7DD2",           // Deep Blue for Haplotype 2
+  hp2Point: "#63A6D8",      // Light Blue for HP2 coverage points
+
+  // Layout, Grid & Axis Colors
+  axis: "#3f464d",          // Axis line & text color
+  grid: "#e5e8eb",          // Grid line color
+  center: "#222222",        // Baseline / center divider color
+  chromBand: "#e7eaed",     // Chromosome alternating background band color
+
+  // Special Genomic Regions Colors
+  maskedRegion: "#E8C766",       // Masked Centromere fill color
+  maskedRegionBorder: "#B58A2A", // Masked Centromere border color
+  lohRegion: "#808080",          // LOH (Loss of Heterozygosity) region fill color
+  lohRegionBorder: "#555555",    // LOH region border color
+};
+
 export const SV_CONFIG = {
   /**
    * Vibrant, bold, high-contrast colors for Structural Variations.
    */
   TYPE_COLORS: {
-    DEL: "#ff002b",   // Bold Crimson / Deep Vivid Red
-    INV: "#00c3ff",   // Vivid Sky Blue / Electric Cyan
-    INS: "#fb00ff",   // Vivid Magenta / Neon Pink
-    BND: "#212529",   // Near-Black / Dark Graphite
-    DUP: "#ffaf01",   // Bright Amber / Golden Yellow
-    sBND: "#00ffea",  // Bright Aqua / Neon Turquoise
+    DEL: "#B82607",   // Bold Crimson / Deep Vivid Red
+    INV: "#D1970F",   // Vivid Sky Blue / Electric Cyan
+    INS: "#0004FF",   // Vivid Magenta / Neon Pink
+    BND: "#616060",   // Near-Black / Dark Graphite
+    DUP: "#399953",   // Bright Amber / Golden Yellow
+    sBND: "#A6A6A6",  // Bright Aqua / Neon Turquoise
   },
 
   /**
    * Arc curve line width and opacity settings.
    */
-  ARC_LINE_WIDTH: 1.15,   // Thick, crisp, highly visible arc lines (default was 1.25)
-  ARC_ALPHA: 0.72,        // Solid crisp opacity (default was 0.72)
-  
+  ARC_LINE_WIDTH: 1.15,   // Thick, crisp, highly visible arc lines
+  ARC_ALPHA: 0.72,        // Solid crisp opacity
+
   /**
    * Marker line width and opacity settings.
    */
-  MARKER_LINE_WIDTH: 1.0, // Vertical breakpoint marker width (default was 1.0)
-  MARKER_ALPHA: 0.34,     // Opacity for breakpoint vertical lines (default was 0.34)
+  MARKER_LINE_WIDTH: 1.0, // Vertical breakpoint marker width
+  MARKER_ALPHA: 0.34,     // Opacity for breakpoint vertical lines
 };
+

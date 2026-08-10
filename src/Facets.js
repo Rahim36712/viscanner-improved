@@ -138,31 +138,31 @@ export class Facets extends React.PureComponent {
         <div className="row z0">
           <div className="col">
             <div className="d-block bg-light px-2 mb-2">
-              <small>NAVIGATION</small>
+              <small>{LABELS.facets.navigationTitle}</small>
             </div>
 
-            <div className="mb-1 mt-3">Go to specific region</div>
+            <div className="mb-1 mt-3">{LABELS.facets.goToRegionLabel}</div>
             <input
               type="text"
               onChange={this.addToRegion}
               className={regionClass}
-              placeholder="e.g., chr2:1000-chr2:2000"
+              placeholder={LABELS.facets.goToRegionPlaceholder}
             />
             <button
               className="btn btn-outline-primary btn-sm btn-block mb-3"
               onClick={this.goToRegion}
             >
-              Go
+              {LABELS.facets.goButton}
             </button>
 
-            <div className="mb-1 mt-2">Go to specific gene</div>
+            <div className="mb-1 mt-2">{LABELS.facets.goToGeneLabel}</div>
             <GeneSearchBox />
             <button
               className="btn btn-outline-secondary btn-sm btn-block mt-2 mb-3"
               onClick={resetHiglassView}
               type="button"
             >
-              Reset View
+              {LABELS.facets.resetViewButton}
             </button>
             {/* <div className="form-check mt-3">
               <input

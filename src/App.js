@@ -5,7 +5,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
 import { fitToContent, scheduleFitToContent } from "./higlassLayout";
-import { LABELS, SV_CONFIG } from "./labelsConfig";
+import { LABELS, SV_CONFIG, UI_COLORS } from "./labelsConfig";
 
 const DEFAULT_WAKHAN_VISIBILITY = {
   showHp1: true,
@@ -326,16 +326,16 @@ function App() {
   return (
     <div className="App">
       <div id="overlay">
-        <div id="overlay-text"><i className="fas fa fa-spin fa-spinner mr-1"></i>Loading data</div>
+        <div id="overlay-text"><i className="fas fa fa-spin fa-spinner mr-1"></i>{LABELS.loadingOverlay}</div>
       </div>
 
       <div className="container-fluid px-4 mt-5">
-        <h2 id="variant-view" className="text-center">
+        <h2 id="variant-view" className="text-center" style={{ color: UI_COLORS.appTitleColor }}>
           {LABELS.appTitle}
         </h2>
         <CnvTable />
 
-        <div className="h3 mt-5" id="sec:visualization">
+        <div className="h3 mt-5" id="sec:visualization" style={{ color: UI_COLORS.visualizationSectionTitleColor }}>
           {LABELS.visualizationSectionTitle}
         </div>
         <div className="row mt-4">

@@ -10,7 +10,7 @@ import {
   getDynamicChrAbs,
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
-import { LABELS, SV_CONFIG } from "./labelsConfig";
+import { LABELS, SV_CONFIG, TRACK_COLORS } from "./labelsConfig";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -20,21 +20,21 @@ import {
   logDevSkip,
 } from "./safeRendering";
 
-const HP1_COLOR = "#B23A48";
-const HP1_POINT_COLOR = "#D95F65";
-const HP2_COLOR = "#2D7DD2";
-const HP2_POINT_COLOR = "#63A6D8";
-const AXIS_COLOR = "#3f464d";
-const GRID_COLOR = "#e5e8eb";
-const CENTER_COLOR = "#222222";
-const CHROM_BAND_COLOR = "#e7eaed";
-const MASKED_REGION_COLOR = "#E8C766";
+const HP1_COLOR = TRACK_COLORS.hp1;
+const HP1_POINT_COLOR = TRACK_COLORS.hp1Point;
+const HP2_COLOR = TRACK_COLORS.hp2;
+const HP2_POINT_COLOR = TRACK_COLORS.hp2Point;
+const AXIS_COLOR = TRACK_COLORS.axis;
+const GRID_COLOR = TRACK_COLORS.grid;
+const CENTER_COLOR = TRACK_COLORS.center;
+const CHROM_BAND_COLOR = TRACK_COLORS.chromBand;
+const MASKED_REGION_COLOR = TRACK_COLORS.maskedRegion;
 const MASKED_REGION_ALPHA = 0.3;
-const MASKED_REGION_BORDER_COLOR = "#B58A2A";
+const MASKED_REGION_BORDER_COLOR = TRACK_COLORS.maskedRegionBorder;
 const MASKED_REGION_BORDER_ALPHA = 0.7;
-const LOH_REGION_COLOR = "#808080";
+const LOH_REGION_COLOR = TRACK_COLORS.lohRegion;
 const LOH_REGION_ALPHA = 0.35;
-const LOH_REGION_BORDER_COLOR = "#555555";
+const LOH_REGION_BORDER_COLOR = TRACK_COLORS.lohRegionBorder;
 const LOH_REGION_BORDER_ALPHA = 0.7;
 const COVERAGE_DOT_SIZE = 1.6;
 const COVERAGE_TICK_STEP = 30;

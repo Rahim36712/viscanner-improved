@@ -3,7 +3,7 @@ import { ChromosomeInfo, chrToAbs } from "smaht-higlass-misc/es/chrom-utils";
 import { format } from "d3-format";
 import { getPlotBounds, mapTrackX, getGlobalMasterChromBounds } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
-import { LABELS, SV_CONFIG } from "./labelsConfig";
+import { LABELS, SV_CONFIG, TRACK_COLORS } from "./labelsConfig";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -15,9 +15,9 @@ import {
 
 const TYPE_COLORS = SV_CONFIG.TYPE_COLORS;
 
-const AXIS_COLOR = "#3f464d";
-const GRID_COLOR = "#e5e8eb";
-const CHROM_BAND_COLOR = "#e7eaed";
+const AXIS_COLOR = TRACK_COLORS.axis;
+const GRID_COLOR = TRACK_COLORS.grid;
+const CHROM_BAND_COLOR = TRACK_COLORS.chromBand;
 const ARC_ALPHA = SV_CONFIG.ARC_ALPHA;
 const MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
 const DEFAULT_VISIBLE_TYPES = {
