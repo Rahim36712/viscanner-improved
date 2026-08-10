@@ -1,7 +1,7 @@
 {
   "name": "viscanner",
   "version": "0.1.1",
-  "homepage": "https://Rahim36712.github.io/viscanner-improved",
+  "homepage": "https://wakhan-visualization.github.io",
   "private": true,
   "dependencies": {
     "@zip.js/zip.js": "^2.7.32",
