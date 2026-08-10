@@ -274,6 +274,10 @@ export function parseMaskedRegionBed(v) {
   return rows;
 }
 
+export function parseLohRegionBed(v) {
+  return parseMaskedRegionBed(v);
+}
+
 export function parseWakhanSegmentBed(v, haplotypeKey) {
   const rows = [];
   v.trim()
@@ -465,7 +469,7 @@ function updateWakhanStructuralVariationTrack(data) {
   }
 }
 
-function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = []) {
+function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = [], lohRegions = []) {
   const hgc = window.hgc.current;
   const viewconfCohort = hgc.api.getViewConfig();
 
@@ -488,6 +492,7 @@ function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, mask
       hp1Segments,
       hp2Segments,
       maskedRegions,
+      lohRegions,
     });
   }
 
@@ -541,6 +546,14 @@ function parseUploadedEntryTexts(entryTexts, props) {
     ? parseMaskedRegionBed(entryTexts[maskedRegionFilename])
     : [];
 
+  const lohRegionFilename = Object.keys(entryTexts).find((filename) => {
+    const lowerFilename = filename.toLowerCase();
+    return lowerFilename.includes("loh");
+  });
+  const lohRegions = lohRegionFilename
+    ? parseLohRegionBed(entryTexts[lohRegionFilename])
+    : [];
+
   if (entryTexts["cna_short.txt"]) {
     props.populateTable(parseHiglassData(entryTexts["cna_short.txt"]));
   }
@@ -578,7 +591,8 @@ function parseUploadedEntryTexts(entryTexts, props) {
           parseWakhanCoverageData(entryTexts["phase_corrected_coverage.csv"]),
           hp1Segments,
           hp2Segments,
-          maskedRegions
+          maskedRegions,
+          lohRegions
         );
       } else {
         updateCopyNumberTracks(wakhanData, false);

@@ -32,6 +32,10 @@ const MASKED_REGION_COLOR = "#E8C766";
 const MASKED_REGION_ALPHA = 0.3;
 const MASKED_REGION_BORDER_COLOR = "#B58A2A";
 const MASKED_REGION_BORDER_ALPHA = 0.7;
+const LOH_REGION_COLOR = "#808080";
+const LOH_REGION_ALPHA = 0.35;
+const LOH_REGION_BORDER_COLOR = "#555555";
+const LOH_REGION_BORDER_ALPHA = 0.7;
 const COVERAGE_DOT_SIZE = 1.6;
 const COVERAGE_TICK_STEP = 30;
 const SV_MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
@@ -263,10 +267,12 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.hp1Segments = [];
       this.hp2Segments = [];
       this.maskedRegions = [];
+      this.lohRegions = [];
       this.currentCoverage = [];
       this.currentHp1Segments = [];
       this.currentHp2Segments = [];
       this.currentMaskedRegions = [];
+      this.currentLohRegions = [];
       this.currentSvMarkers = [];
       this.svData = this.options.svData || { variants: [], matchedIds: [] };
       this.svVariants = [];
@@ -274,9 +280,10 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.svHitRegions = [];
       this.showHp1 = this.options.showHp1 !== false;
       this.showHp2 = this.options.showHp2 !== false;
-      this.showCoverage = this.options.showCoverage !== false;
+      this.showCoverage = this.showCoverage !== false;
       this.showSvBreakpoints = this.options.showSvBreakpoints !== false;
       this.showMaskedRegions = this.options.showMaskedRegions === true;
+      this.showLohRegions = this.options.showLohRegions !== false;
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
       this.visibleSvTypes = {
         ...DEFAULT_VISIBLE_TYPES,
@@ -315,6 +322,7 @@ function WakhanCoverageTrack(HGC, ...args) {
 
       this.bgGraphics = new this.HGC.libraries.PIXI.Graphics();
       this.maskedRegionGraphics = new this.HGC.libraries.PIXI.Graphics();
+      this.lohRegionGraphics = new this.HGC.libraries.PIXI.Graphics();
       this.svGraphics = new this.HGC.libraries.PIXI.Graphics();
       this.coverageGraphics = new this.HGC.libraries.PIXI.Graphics();
       this.segmentGraphics = new this.HGC.libraries.PIXI.Graphics();
@@ -331,6 +339,7 @@ function WakhanCoverageTrack(HGC, ...args) {
 
       this.pMain.addChild(this.bgGraphics);
       this.pMain.addChild(this.maskedRegionGraphics);
+      this.pMain.addChild(this.lohRegionGraphics);
       this.pMain.addChild(this.svGraphics);
       this.pMain.addChild(this.coverageGraphics);
       this.pMain.addChild(this.segmentGraphics);
@@ -376,6 +385,10 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.showMaskedRegions = options.showMaskedRegions === true;
         this.options.showMaskedRegions = this.showMaskedRegions;
       }
+      if (options.showLohRegions !== undefined) {
+        this.showLohRegions = options.showLohRegions !== false;
+        this.options.showLohRegions = this.showLohRegions;
+      }
       if (options.svMode) {
         this.svMode = options.svMode;
         this.options.svMode = options.svMode;
@@ -404,12 +417,14 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.hp1Segments = [];
       this.hp2Segments = [];
       this.maskedRegions = [];
+      this.lohRegions = [];
       const hasCoveragePayload =
         data &&
         (Array.isArray(data.coverage) ||
           Array.isArray(data.hp1Segments) ||
           Array.isArray(data.hp2Segments) ||
-          Array.isArray(data.maskedRegions));
+          Array.isArray(data.maskedRegions) ||
+          Array.isArray(data.lohRegions));
       if (data && data.svData) {
         this.parseStructuralVariationData(data.svData);
       } else if (!hasCoveragePayload) {
@@ -464,6 +479,21 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.hp1Segments = parseSegments(data.hp1Segments, "hp1");
       this.hp2Segments = parseSegments(data.hp2Segments, "hp2");
       this.maskedRegions = (data.maskedRegions || [])
+        .filter((row) => row && this.chromInfo.chrPositions[row.chr])
+        .map((row) => {
+          const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
+          const endAbs = getDynamicChrAbs(row.chr, row.end, this.chromInfo, masterBounds);
+          return {
+            chr: row.chr,
+            start: row.start,
+            end: row.end,
+            startAbs,
+            endAbs,
+          };
+        })
+        .filter((row) => isFiniteNumber(row.startAbs) && isFiniteNumber(row.endAbs));
+
+      this.lohRegions = (data.lohRegions || [])
         .filter((row) => row && this.chromInfo.chrPositions[row.chr])
         .map((row) => {
           const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
@@ -541,6 +571,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.showCoverage = this.showCoverage === undefined ? this.options.showCoverage !== false : this.showCoverage;
       this.showSvBreakpoints = this.showSvBreakpoints === undefined ? this.options.showSvBreakpoints !== false : this.showSvBreakpoints;
       this.showMaskedRegions = this.showMaskedRegions === undefined ? this.options.showMaskedRegions === true : this.showMaskedRegions;
+      this.showLohRegions = this.showLohRegions === undefined ? this.options.showLohRegions !== false : this.showLohRegions;
       this.svMode = this.svMode || this.options.svMode || DEFAULT_SV_MODE;
       this.visibleSvTypes = {
         ...DEFAULT_VISIBLE_TYPES,
@@ -803,6 +834,9 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.currentMaskedRegions = (this.maskedRegions || []).filter(
         (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
       );
+      this.currentLohRegions = (this.lohRegions || []).filter(
+        (row) => row && isFiniteNumber(row.endAbs) && isFiniteNumber(row.startAbs) && row.endAbs >= fromX && row.startAbs <= toX
+      );
 
       const minLength = this.options.minVariantLength === undefined ? 50 : this.options.minVariantLength;
       const maxLength = this.maxVariantLength;
@@ -877,6 +911,38 @@ function WakhanCoverageTrack(HGC, ...args) {
 
         this.maskedRegionGraphics.lineStyle(1, this.HGC.utils.colorToHex(MASKED_REGION_BORDER_COLOR), MASKED_REGION_BORDER_ALPHA);
         safeDrawRect(this.maskedRegionGraphics, xStart, top, Math.max(1, width), height, "drawMaskedRegions:border");
+      });
+    }
+
+    drawLohRegions() {
+      if (!this.showLohRegions || !this.currentLohRegions.length) {
+        return;
+      }
+      const { top, leftAxisX, rightAxisX, height } = this.metrics();
+      const color = this.HGC.utils.colorToHex(LOH_REGION_COLOR);
+
+      this.currentLohRegions.forEach((region) => {
+        if (!region || !isFiniteNumber(region.startAbs) || !isFiniteNumber(region.endAbs)) {
+          return;
+        }
+        const rawXStart = this.plotX(region.startAbs);
+        const rawXEnd = this.plotX(region.endAbs);
+        if (!isFiniteNumber(rawXStart) || !isFiniteNumber(rawXEnd)) {
+          return;
+        }
+
+        const xStart = Math.max(leftAxisX, rawXStart);
+        const xEnd = Math.min(rightAxisX, rawXEnd);
+        const width = xEnd - xStart;
+        if (width <= 0) {
+          return;
+        }
+        this.lohRegionGraphics.beginFill(color, LOH_REGION_ALPHA);
+        safeDrawRect(this.lohRegionGraphics, xStart, top, Math.max(1, width), height, "drawLohRegions:fill");
+        this.lohRegionGraphics.endFill();
+
+        this.lohRegionGraphics.lineStyle(1, this.HGC.utils.colorToHex(LOH_REGION_BORDER_COLOR), LOH_REGION_BORDER_ALPHA);
+        safeDrawRect(this.lohRegionGraphics, xStart, top, Math.max(1, width), height, "drawLohRegions:border");
       });
     }
 
@@ -1071,6 +1137,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.loadingText.text = "";
       this.bgGraphics.clear();
       this.maskedRegionGraphics.clear();
+      this.lohRegionGraphics.clear();
       this.svGraphics.clear();
       this.coverageGraphics.clear();
       this.segmentGraphics.clear();
@@ -1098,6 +1165,12 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.drawMaskedRegions();
       } catch (err) {
         logDevSkip(null, "Error drawing masked regions in coverage track", { error: err?.message });
+      }
+
+      try {
+        this.drawLohRegions();
+      } catch (err) {
+        logDevSkip(null, "Error drawing LOH regions in coverage track", { error: err?.message });
       }
 
       try {
@@ -1308,6 +1381,7 @@ WakhanCoverageTrack.config = {
     "showCoverage",
     "showSvBreakpoints",
     "showMaskedRegions",
+    "showLohRegions",
     "svData",
     "svMode",
     "visibleTypes",
@@ -1323,6 +1397,7 @@ WakhanCoverageTrack.config = {
     showCoverage: true,
     showSvBreakpoints: true,
     showMaskedRegions: false,
+    showLohRegions: true,
     svData: { variants: [], matchedIds: [] },
     svMode: DEFAULT_SV_MODE,
     visibleTypes: DEFAULT_VISIBLE_TYPES,

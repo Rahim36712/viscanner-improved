@@ -7,6 +7,7 @@ import {
   parseSeverusVcf,
   parseWakhanCoverageData,
   parseMaskedRegionBed,
+  parseLohRegionBed,
   parseWakhanSegmentBed,
   parseWakhanSegmentTableData,
   parseWakhanCopyNumberData,
@@ -203,6 +204,20 @@ describe("Uploader Data Parsers and Utilities", () => {
       const bedText = "chr1 NaN 2000\n\t1000\t2000";
       const rows = parseMaskedRegionBed(bedText);
       expect(rows).toEqual([]);
+    });
+  });
+
+  describe("parseLohRegionBed", () => {
+    test("parses valid LOH BED file lines", () => {
+      const bedText = "chr2\t5000\t15000\tLOH_region_1";
+      const rows = parseLohRegionBed(bedText);
+      expect(rows).toEqual([{ chr: "chr2", start: 5000, end: 15000 }]);
+    });
+
+    test("skips invalid rows and comments in LOH BED file", () => {
+      const bedText = "# header\nchrX\t100\t200\nchr1\tinvalid\t300";
+      const rows = parseLohRegionBed(bedText);
+      expect(rows).toEqual([{ chr: "chrX", start: 100, end: 200 }]);
     });
   });
 
