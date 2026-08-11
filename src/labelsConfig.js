@@ -37,6 +37,22 @@ export const LABELS = {
     resetViewButton: "Reset View",
   },
 
+  // Gene Annotation Filtering Section
+  geneFilter: {
+    sectionTitle: "GENE FILTERING",
+    filterLabel: "Filter genes on track",
+    inputPlaceholder: "Add gene (e.g. TERT, TP53)",
+    presetsTitle: "Presets:",
+    presetVisiblePlot: "Filter by Genes in Current Plot",
+    presetCancer: "TERT & Drivers",
+    presetDnaRepair: "DNA Repair",
+    clearFilter: "Clear",
+    showingAll: "Showing all genes",
+    showingFiltered: "Filtered: {count} gene(s)",
+    zoomToGeneTooltip: "Zoom to gene",
+    removeGeneTooltip: "Remove gene"
+  },
+
   // WAKHAN Track Visibility Controls (Left Panel)
   wakhanVisibility: {
     panelTitle: "WAKHAN visibility",

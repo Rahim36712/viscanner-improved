@@ -3,6 +3,7 @@
 import React from "react";
 
 import { GeneSearchBox } from "./GeneSearchBox";
+import { GeneFilterControl } from "./GeneFilterControl";
 import { ChromosomeInfo } from "higlass/dist/hglib";
 import { resetHiglassView, scheduleFitToContent } from "./higlassLayout";
 import { exportSvgAsPdf } from "./pdfExport";
@@ -124,6 +125,45 @@ export class Facets extends React.PureComponent {
       });
   };
 
+  handleGeneFilterChange = (geneList) => {
+    if (window.hgc && window.hgc.current) {
+      const hgc = window.hgc.current;
+      if (hgc.api && typeof hgc.api.getTrackObject === "function") {
+        const geneTrack = hgc.api.getTrackObject("aa", "OHJakQICQD6gTD7skx4EWA");
+        if (geneTrack && typeof geneTrack.setGeneFilter === "function") {
+          geneTrack.setGeneFilter(geneList);
+        }
+      }
+    }
+  };
+
+  handleZoomToGene = (geneName) => {
+    if (window.hgc && window.hgc.current) {
+      const hgc = window.hgc.current;
+      if (hgc.api && typeof hgc.api.getViewConfig === "function") {
+        const viewconf = hgc.api.getViewConfig();
+        if (viewconf && viewconf.views && viewconf.views[0]) {
+          const viewId0 = viewconf.views[0].uid;
+          hgc.api.zoomToGene(viewId0, geneName, 1000, 300);
+          scheduleFitToContent({ delay: 350 });
+        }
+      }
+    }
+  };
+
+  handleFetchVisibleGenes = () => {
+    if (window.hgc && window.hgc.current) {
+      const hgc = window.hgc.current;
+      if (hgc.api && typeof hgc.api.getTrackObject === "function") {
+        const geneTrack = hgc.api.getTrackObject("aa", "OHJakQICQD6gTD7skx4EWA");
+        if (geneTrack && typeof geneTrack.getVisibleGeneNames === "function") {
+          return geneTrack.getVisibleGeneNames();
+        }
+      }
+    }
+    return [];
+  };
+
   render() {
     // const consequenceLevels = [CL_HIGH, CL_MODERATE, CL_LOW, CL_MODIFIER];
 
@@ -164,6 +204,15 @@ export class Facets extends React.PureComponent {
             >
               {LABELS.facets.resetViewButton}
             </button>
+
+            <div className="d-block bg-light px-2 mb-2 mt-3">
+              <small>{(LABELS.geneFilter && LABELS.geneFilter.sectionTitle) || "GENE FILTERING"}</small>
+            </div>
+            <GeneFilterControl
+              onFilterChange={this.handleGeneFilterChange}
+              onZoomToGene={this.handleZoomToGene}
+              onFetchVisibleGenes={this.handleFetchVisibleGenes}
+            />
             {/* <div className="form-check mt-3">
               <input
                 type="checkbox"

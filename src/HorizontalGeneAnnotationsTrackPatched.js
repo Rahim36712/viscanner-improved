@@ -2,6 +2,70 @@ import { getPlotBounds, mapTrackX } from "./plotBounds";
 
 const TRACK_TYPE = "aligned-horizontal-gene-annotations";
 
+function getAllGeneSymbolsFromTd(td) {
+  const symbols = new Set();
+  if (!td) return symbols;
+
+  // 1. Check direct geneName property if present
+  if (td.geneName && typeof td.geneName === "string") {
+    symbols.add(td.geneName.trim().toUpperCase());
+  }
+
+  // 2. Check td.fields array for clean gene symbols (excluding exon arrays at index 10 & 11)
+  if (Array.isArray(td.fields)) {
+    td.fields.forEach((field, index) => {
+      // Exclude numeric exon sizes/starts arrays to avoid false positive token matches
+      if (index === 10 || index === 11) return;
+
+      if (typeof field === "string" && field.trim().length >= 2) {
+        const val = field.trim().toUpperCase();
+        // Ignore pure numbers or RefSeq accession prefixes (NM_, NR_)
+        if (/^\d+$/.test(val) || val.startsWith("NM_") || val.startsWith("NR_") || val === "HG19") {
+          return;
+        }
+        symbols.add(val);
+
+        // Add base token if field has version/isoform delimiters (e.g. "TP53.1" -> "TP53")
+        val.split(/[|_\.\/\s]+/).forEach((part) => {
+          if (
+            part.length >= 2 &&
+            !/^\d+$/.test(part) &&
+            !part.startsWith("NM") &&
+            !part.startsWith("NR") &&
+            part !== "HG19"
+          ) {
+            symbols.add(part);
+          }
+        });
+      }
+    });
+  }
+
+  return symbols;
+}
+
+function isGeneMatchingFilter(td, instance, geneFilterSet) {
+  if (!td) return false;
+  if (td.type === "filler") return true;
+
+  const candidateSymbols = getAllGeneSymbolsFromTd(td);
+  if (candidateSymbols.size === 0) return false;
+
+  for (const filterGene of geneFilterSet) {
+    for (const candidate of candidateSymbols) {
+      if (
+        candidate === filterGene ||
+        candidate.startsWith(filterGene) ||
+        filterGene.startsWith(candidate)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
   const OriginalTrack = HGC.tracks.HorizontalGeneAnnotationsTrack;
   if (!OriginalTrack) {
@@ -9,14 +73,133 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
     return null;
   }
 
-  // Create the real instance using the original class constructor.
-  // We keep the original uncompressed _xScale intact so HiGlass
-  // internals (including stretchRects and zooming) work perfectly.
   const instance = new OriginalTrack(...args);
 
-  // Hook into draw() to:
-  // 1. Perform original draw logic (which renders genes/labels in uncompressed [0, width] space)
-  // 2. Compress and translate the PIXI graphics container of each tile to [72, width - 78]
+  instance.geneFilterSet = null;
+
+  // Save reference to HiGlass's original renderTile method
+  const originalRenderTile = instance.renderTile.bind(instance);
+
+  // Hook renderTile to filter tileData BEFORE HiGlass draws PIXI rects and text
+  instance.renderTile = function patchedRenderTile(tile) {
+    if (!tile || !tile.tileData) return;
+
+    // 1. Preserve exact original tileData reference from HiGlass upon first load
+    if (!tile.originalTileData) {
+      tile.originalTileData = tile.tileData;
+    }
+
+    // 2. Filter tile.tileData based on active geneFilterSet
+    if (instance.geneFilterSet && instance.geneFilterSet.size > 0) {
+      tile.tileData = tile.originalTileData.filter((td) =>
+        isGeneMatchingFilter(td, instance, instance.geneFilterSet)
+      );
+    } else {
+      // 3. Restore exact original tileData reference when filter is cleared / empty
+      tile.tileData = tile.originalTileData;
+    }
+
+    // 4. Delegate to HiGlass's original renderTile to draw tileData into PIXI
+    originalRenderTile(tile);
+  };
+
+  const originalGetMouseOverHtml = typeof instance.getMouseOverHtml === "function"
+    ? instance.getMouseOverHtml.bind(instance)
+    : null;
+
+  if (originalGetMouseOverHtml) {
+    instance.getMouseOverHtml = function patchedGetMouseOverHtml(trackX, trackY) {
+      if (instance.fetchedTiles) {
+        Object.values(instance.fetchedTiles).forEach((tile) => {
+          if (tile && Array.isArray(tile.tileData)) {
+            tile.tileData.forEach((td) => {
+              if (td && !td.fields) {
+                td.fields = [];
+              }
+            });
+          }
+        });
+      }
+      try {
+        return originalGetMouseOverHtml(trackX, trackY);
+      } catch (err) {
+        console.warn("Caught error in getMouseOverHtml:", err);
+        return "";
+      }
+    };
+  }
+
+  instance.setGeneFilter = function (geneList) {
+    if (Array.isArray(geneList) && geneList.length > 0) {
+      instance.geneFilterSet = new Set(
+        geneList.map((g) => String(g).trim().toUpperCase()).filter(Boolean)
+      );
+    } else {
+      instance.geneFilterSet = null;
+    }
+
+    // Clear tile graphics & texts to force HiGlass to re-render tileData
+    Object.values(instance.fetchedTiles).forEach((tile) => {
+      if (tile.graphics) tile.graphics.clear();
+      if (tile.rectGraphics) tile.rectGraphics.clear();
+      if (tile.rectMaskGraphics) tile.rectMaskGraphics.clear();
+      if (tile.textGraphics) {
+        tile.textGraphics.removeChildren();
+      }
+      if (tile.textBgGraphics) tile.textBgGraphics.clear();
+
+      tile.texts = {};
+      tile.initialized = false;
+
+      if (typeof instance.renderTile === "function") {
+        instance.renderTile(tile);
+      }
+    });
+
+    if (Array.isArray(instance.allTexts)) instance.allTexts = [];
+    if (Array.isArray(instance.allBoxes)) instance.allBoxes = [];
+
+    if (typeof instance.draw === "function") {
+      instance.draw();
+    }
+
+    // Immediately flush WebGL canvas frame within sub-milliseconds
+    if (window.hgc && window.hgc.current) {
+      const hgc = window.hgc.current;
+      try {
+        if (hgc.pixiStage && hgc.pixiRenderer) {
+          hgc.pixiRenderer.render(hgc.pixiStage);
+        }
+      } catch (e) {}
+    }
+  };
+
+  instance.getVisibleGeneNames = function () {
+    const geneNames = new Set();
+    Object.values(instance.fetchedTiles).forEach((tile) => {
+      const data = tile.originalTileData || tile.tileData;
+      if (Array.isArray(data)) {
+        data.forEach((td) => {
+          if (td.type === "filler") return;
+          const candidates = getAllGeneSymbolsFromTd(td);
+          candidates.forEach((name) => {
+            if (
+              name &&
+              name.length >= 2 &&
+              !/^\d+$/.test(name) &&
+              !name.startsWith("NM") &&
+              !name.startsWith("NR") &&
+              name !== "HG19"
+            ) {
+              geneNames.add(name);
+            }
+          });
+        });
+      }
+    });
+    return Array.from(geneNames).sort();
+  };
+
   const originalDraw = instance.draw.bind(instance);
   instance.draw = function patchedDraw() {
     originalDraw();
@@ -30,18 +213,14 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
     const compressionScale = (right - left) / width;
     const compressionOffset = left;
 
+    const allRenderedTexts = [];
+
     Object.values(instance.fetchedTiles).forEach((tile) => {
       if (!tile.graphics) return;
 
-      // stretchRects (called inside renderTile/draw) sets tile.rectGraphics
-      // and tile.rectMaskGraphics scale/position. We need to incorporate those
-      // child transforms into a single parent transform to avoid double-scaling.
-
-      // Read the stretchRects values from tile.rectGraphics (if any)
       const childScaleX = tile.rectGraphics ? tile.rectGraphics.scale.x : 1;
       const childOffsetX = tile.rectGraphics ? tile.rectGraphics.x : 0;
 
-      // Reset child container transforms to neutral
       if (tile.rectGraphics) {
         tile.rectGraphics.scale.x = 1;
         tile.rectGraphics.x = 0;
@@ -51,15 +230,10 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
         tile.rectMaskGraphics.x = 0;
       }
 
-      // Apply combined transform: first stretchRects, then compression
-      // Combined: effective_x = compressionOffset + (childOffsetX + local_x * childScaleX) * compressionScale
-      // = compressionOffset + childOffsetX * compressionScale + local_x * childScaleX * compressionScale
-      tile.graphics.scale.x = childScaleX * compressionScale;
+      const parentScaleX = childScaleX * compressionScale;
+      tile.graphics.scale.x = parentScaleX;
       tile.graphics.x = compressionOffset + childOffsetX * compressionScale;
 
-      // Exclude text/label children (tile.textGraphics and tile.textBgGraphics)
-      // from the parent scale.
-      const parentScaleX = tile.graphics.scale.x;
       const invScaleX = parentScaleX !== 0 ? 1 / parentScaleX : 1;
 
       if (tile.textGraphics) {
@@ -71,7 +245,6 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
         tile.textBgGraphics.x = 0;
       }
 
-      // Reposition their .x individually via mapTrackX(instance, <their genomic position>)
       if (tile.initialized && tile.texts && tile.tileData) {
         tile.tileData.forEach((td) => {
           if (td.type === "filler") return;
@@ -84,13 +257,63 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
           const txEnd = +td.fields[2] + chrOffset;
           const txMiddle = (txStart + txEnd) / 2;
 
-          text.txMiddle = txMiddle; // Cache txMiddle for redrawing background rects
-          text.position.x = mapTrackX(instance, txMiddle) - tile.graphics.x;
+          text.txMiddle = txMiddle;
+
+          const targetScreenX = mapTrackX(instance, txMiddle);
+          text.position.x = (targetScreenX - tile.graphics.x) * parentScaleX;
+          text.scale.x = 1;
+
+          const textWidth = (text.width && text.width > 0)
+            ? text.width
+            : (text.text ? text.text.length * 7 : 35);
+          const strand = td.fields && td.fields[5] ? td.fields[5] : "+";
+
+          allRenderedTexts.push({
+            text,
+            targetScreenX,
+            textWidth,
+            strand,
+            isPlusStrand: strand === "+",
+            tile,
+            parentScaleX,
+          });
         });
       }
     });
 
-    // Redraw text backgrounds using the new mapped positions
+    // Smart 1D Screen-Space Collision Detection in Mapped Coordinates
+    const occupiedPlus = [];
+    const occupiedMinus = [];
+
+    allRenderedTexts.sort((a, b) => a.targetScreenX - b.targetScreenX);
+
+    allRenderedTexts.forEach((item) => {
+      const { text, targetScreenX, textWidth, isPlusStrand } = item;
+      const padding = 10; // 10px minimum padding between text labels on screen
+      const leftBoundary = targetScreenX - textWidth / 2 - padding;
+      const rightBoundary = targetScreenX + textWidth / 2 + padding;
+
+      const occupiedList = isPlusStrand ? occupiedPlus : occupiedMinus;
+
+      let collides = false;
+      for (const interval of occupiedList) {
+        if (leftBoundary < interval.right && rightBoundary > interval.left) {
+          collides = true;
+          break;
+        }
+      }
+
+      // When unfiltered, hide colliding gene labels to prevent text overlapping!
+      // When user filters specific genes, always render target genes clearly!
+      if (collides && !instance.geneFilterSet) {
+        text.visible = false;
+      } else {
+        text.visible = true;
+        occupiedList.push({ left: leftBoundary, right: rightBoundary });
+      }
+    });
+
+    // Redraw text backgrounds for visible labels using mapped screen coordinates
     Object.values(instance.fetchedTiles).forEach((tile) => {
       if (!tile.graphics) return;
 
@@ -107,12 +330,11 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
     if (instance.allTexts && instance.allBoxes) {
       instance.allTexts.forEach((textObj, i) => {
         const text = textObj.text;
-        if (!text.visible) return;
+        if (!text || !text.visible) return;
 
         const box = instance.allBoxes[i];
         if (!box) return;
 
-        // Find the tile graphics
         const textGraphics = text.parent;
         if (!textGraphics || !textGraphics.parent) return;
         const tileGraphics = textGraphics.parent;
@@ -123,16 +345,16 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
 
         if (text.txMiddle === undefined) return;
 
+        const parentScaleX = tile.graphics.scale.x;
         const targetScreenX = mapTrackX(instance, text.txMiddle);
-        const localCenterX = targetScreenX - tile.graphics.x;
+        const localCenterX = (targetScreenX - tile.graphics.x) * parentScaleX;
 
         const [minX, minY, maxX, maxY] = box;
         const width = maxX - minX;
         const height = maxY - minY;
 
-        // Redraw using the offset coordinate formula
         tile.textBgGraphics.drawRect(
-          localCenterX - width,
+          localCenterX - width / 2,
           minY - height / 2,
           width,
           height
