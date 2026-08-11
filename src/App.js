@@ -355,9 +355,26 @@ function App() {
         <div className="py-5"></div>
       </div>
       <div className="container-fluid bg-light mt-5 py-4 text-center">
-        <div className="mb-1">
-          {LABELS.footer.supportText}
-          <a href={LABELS.footer.githubUrl}>{LABELS.footer.githubLinkText}</a>.
+        <div className="mb-1" style={{ fontSize: "14px" }}>
+          {LABELS.footer.text}
+          <a
+            href={LABELS.footer.originalRepoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fw-bold mx-1"
+          >
+            {LABELS.footer.originalRepoText}
+          </a>
+          {" or "}
+          <a
+            href={LABELS.footer.wakhanRepoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fw-bold mx-1"
+          >
+            {LABELS.footer.wakhanRepoText}
+          </a>
+          .
         </div>
       </div>
     </div>

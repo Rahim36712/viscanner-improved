@@ -113,9 +113,11 @@ export const LABELS = {
 
   // Footer
   footer: {
-    supportText: "For support or questions, please open an issue on our ",
-    githubLinkText: "GitHub repository",
-    githubUrl: "https://github.com/parklab/hiscanner",
+    text: "For support, documentation, or code contributions, visit the ",
+    originalRepoText: "Original HiScanner Repository",
+    originalRepoUrl: "https://github.com/parklab/hiscanner",
+    wakhanRepoText: "WAKHAN Visualization Repository",
+    wakhanRepoUrl: "https://github.com/wakhan-visualization/wakhan-visualization.github.io",
   },
 };
 
