@@ -470,7 +470,7 @@ function updateWakhanStructuralVariationTrack(data) {
   }
 }
 
-function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = [], lohRegions = []) {
+function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, maskedRegions = [], lohRegions = [], maskedRegionsByBuild = {}, selectedBuild = "GRCh38") {
   const hgc = window.hgc.current;
   const viewconfCohort = hgc.api.getViewConfig();
 
@@ -488,11 +488,17 @@ function updateWakhanCoverageTracks(coverageRows, hp1Segments, hp2Segments, mask
         hp2Segments,
       });
     }
+    const activeMaskedRegions = Array.isArray(maskedRegions) && maskedRegions.length > 0
+      ? maskedRegions
+      : (maskedRegionsByBuild[selectedBuild] || maskedRegionsByBuild.GRCh38 || []);
+
     wakhanTrack.setData({
       coverage: coverageRows,
       hp1Segments,
       hp2Segments,
-      maskedRegions,
+      maskedRegions: activeMaskedRegions,
+      maskedRegionsByBuild,
+      selectedCentromereBuild: selectedBuild,
       lohRegions,
     });
   }
@@ -536,16 +542,51 @@ function showUploadError(message) {
 
 function parseUploadedEntryTexts(entryTexts, props) {
   let matchedSvIds = [];
-  const maskedRegionFilename = Object.keys(entryTexts).find((filename) => {
-    const lowerFilename = filename.toLowerCase();
-    return (
-      lowerFilename === "grch38.cen_coord.curated.bed" ||
-      (lowerFilename.includes("cen_coord") && lowerFilename.endsWith(".bed"))
-    );
+  const filenames = Object.keys(entryTexts);
+
+  // 1. Detect centromere files for GRCh38, GRCh37, and CHM13
+  const grch38Filename = filenames.find((f) => {
+    const l = f.toLowerCase();
+    return l === "grch38.cen_coord.curated.bed" || (l.includes("grch38") && l.includes("cen_coord"));
   });
-  const maskedRegions = maskedRegionFilename
-    ? parseMaskedRegionBed(entryTexts[maskedRegionFilename])
-    : [];
+
+  const grch37Filename = filenames.find((f) => {
+    const l = f.toLowerCase();
+    return l === "grch37.cen_coord.bed" || (l.includes("grch37") && l.includes("cen_coord"));
+  });
+
+  const chm13Filename = filenames.find((f) => {
+    const l = f.toLowerCase();
+    return l === "chm13v2_cen_coord.bed" || (l.includes("chm13") && l.includes("cen_coord"));
+  });
+
+  const genericCenFilename = filenames.find((f) => {
+    const l = f.toLowerCase();
+    return l.includes("cen_coord") && l.endsWith(".bed");
+  });
+
+  const maskedRegionsByBuild = {
+    GRCh38: grch38Filename
+      ? parseMaskedRegionBed(entryTexts[grch38Filename])
+      : genericCenFilename && !grch37Filename && !chm13Filename
+      ? parseMaskedRegionBed(entryTexts[genericCenFilename])
+      : [],
+    GRCh37: grch37Filename ? parseMaskedRegionBed(entryTexts[grch37Filename]) : [],
+    CHM13: chm13Filename ? parseMaskedRegionBed(entryTexts[chm13Filename]) : [],
+  };
+
+  const availableCentromereBuilds = {
+    GRCh38: maskedRegionsByBuild.GRCh38.length > 0,
+    GRCh37: maskedRegionsByBuild.GRCh37.length > 0,
+    CHM13: maskedRegionsByBuild.CHM13.length > 0,
+  };
+
+  const maskedRegions =
+    maskedRegionsByBuild.GRCh38.length > 0
+      ? maskedRegionsByBuild.GRCh38
+      : maskedRegionsByBuild.GRCh37.length > 0
+      ? maskedRegionsByBuild.GRCh37
+      : maskedRegionsByBuild.CHM13;
 
   const lohRegionFilename = Object.keys(entryTexts).find((filename) => {
     const lowerFilename = filename.toLowerCase();
@@ -586,6 +627,8 @@ function parseUploadedEntryTexts(entryTexts, props) {
       props.populateTable({
         type: "wakhan",
         rows: parseWakhanSegmentTableData(hp1Segments, hp2Segments),
+        maskedRegionsByBuild,
+        availableCentromereBuilds,
       });
       if (entryTexts["phase_corrected_coverage.csv"]) {
         updateWakhanCoverageTracks(
@@ -593,7 +636,9 @@ function parseUploadedEntryTexts(entryTexts, props) {
           hp1Segments,
           hp2Segments,
           maskedRegions,
-          lohRegions
+          lohRegions,
+          maskedRegionsByBuild,
+          availableCentromereBuilds.GRCh38 ? "GRCh38" : availableCentromereBuilds.GRCh37 ? "GRCh37" : "CHM13"
         );
       } else {
         updateCopyNumberTracks(wakhanData, false);

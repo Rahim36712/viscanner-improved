@@ -205,6 +205,13 @@ describe("Uploader Data Parsers and Utilities", () => {
       const rows = parseMaskedRegionBed(bedText);
       expect(rows).toEqual([]);
     });
+
+    test("parses GRCh37 and CHM13 centromere BED lines correctly", () => {
+      const grch37Bed = "chr1\t120000\t150000\tcen37";
+      const chm13Bed = "chrX\t300000\t400000\tcen13";
+      expect(parseMaskedRegionBed(grch37Bed)).toEqual([{ chr: "chr1", start: 120000, end: 150000 }]);
+      expect(parseMaskedRegionBed(chm13Bed)).toEqual([{ chr: "chrX", start: 300000, end: 400000 }]);
+    });
   });
 
   describe("parseLohRegionBed", () => {

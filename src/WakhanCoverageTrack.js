@@ -389,6 +389,28 @@ function WakhanCoverageTrack(HGC, ...args) {
         this.showLohRegions = options.showLohRegions !== false;
         this.options.showLohRegions = this.showLohRegions;
       }
+      if (options.selectedCentromereBuild !== undefined) {
+        this.selectedCentromereBuild = options.selectedCentromereBuild;
+        this.options.selectedCentromereBuild = this.selectedCentromereBuild;
+        if (this.maskedRegionsByBuild && this.chromInfo) {
+          const masterBounds = getGlobalMasterChromBounds(this.chromInfo);
+          const raw = this.maskedRegionsByBuild[this.selectedCentromereBuild] || [];
+          this.maskedRegions = raw
+            .filter((row) => row && this.chromInfo.chrPositions[row.chr])
+            .map((row) => {
+              const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);
+              const endAbs = getDynamicChrAbs(row.chr, row.end, this.chromInfo, masterBounds);
+              return {
+                chr: row.chr,
+                start: row.start,
+                end: row.end,
+                startAbs,
+                endAbs,
+              };
+            })
+            .filter((row) => isFiniteNumber(row.startAbs) && isFiniteNumber(row.endAbs));
+        }
+      }
       if (options.svMode) {
         this.svMode = options.svMode;
         this.options.svMode = options.svMode;
@@ -478,7 +500,21 @@ function WakhanCoverageTrack(HGC, ...args) {
 
       this.hp1Segments = parseSegments(data.hp1Segments, "hp1");
       this.hp2Segments = parseSegments(data.hp2Segments, "hp2");
-      this.maskedRegions = (data.maskedRegions || [])
+      if (data && data.maskedRegionsByBuild) {
+        this.maskedRegionsByBuild = data.maskedRegionsByBuild;
+      }
+      if (data && data.selectedCentromereBuild) {
+        this.selectedCentromereBuild = data.selectedCentromereBuild;
+      }
+      const activeBuild = this.selectedCentromereBuild || "GRCh38";
+      const activeRawRegions =
+        this.maskedRegionsByBuild &&
+        this.maskedRegionsByBuild[activeBuild] &&
+        this.maskedRegionsByBuild[activeBuild].length > 0
+          ? this.maskedRegionsByBuild[activeBuild]
+          : data.maskedRegions || [];
+
+      this.maskedRegions = activeRawRegions
         .filter((row) => row && this.chromInfo.chrPositions[row.chr])
         .map((row) => {
           const startAbs = getDynamicChrAbs(row.chr, row.start, this.chromInfo, masterBounds);

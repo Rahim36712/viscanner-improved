@@ -49,10 +49,26 @@ export class CnvTable extends React.PureComponent {
       sortedBy: "",
       sortedByOrder: "asc",
       tableType: "hiscanner",
+      selectedCentromereBuild: "GRCh38",
+      availableCentromereBuilds: { GRCh38: true, GRCh37: true, CHM13: true },
+      maskedRegionsByBuild: null,
     };
   }
 
   componentDidMount() {}
+
+  handleCentromereBuildChange = (build) => {
+    this.setState({ selectedCentromereBuild: build }, () => {
+      const hgc = window.hgc && window.hgc.current;
+      if (!hgc || !hgc.api) return;
+      try {
+        const wakhanTrack = hgc.api.getTrackObject("aa", "wakhan-coverage-track");
+        if (wakhanTrack && wakhanTrack.setVisibilityOptions) {
+          wakhanTrack.setVisibilityOptions({ selectedCentromereBuild: build });
+        }
+      } catch (e) {}
+    });
+  };
 
   nextPage = () => {
     this.setState((prevState) => ({
@@ -69,30 +85,23 @@ export class CnvTable extends React.PureComponent {
   sortTable = (value) => {
     const displayedVariants = JSON.parse(JSON.stringify(this.state.displayedVariants));
     displayedVariants.sort((a, b) => {
-      if(a[value] === "-"){
-        return -1
-      }
-      if(b[value] === "-"){
-        return 1
-      }
-      return a[value] > b[value] ? 1 : b[value] > a[value] ? -1 : 0;
+      if (a[value] === "-") return -1;
+      if (b[value] === "-") return 1;
+      return a[value] > b[value] ? 1 : a[value] < b[value] ? -1 : 0;
     });
 
     let sortedByOrder = this.state.sortedByOrder;
-
-    if(this.state.sortedBy === value && sortedByOrder === "asc"){
-      // Reverse sort
-      console.log("reverse")
+    if (this.state.sortedBy === value && sortedByOrder === "asc") {
       sortedByOrder = "desc";
-    }
-    else{
+      displayedVariants.reverse();
+    } else {
       sortedByOrder = "asc";
     }
 
     this.setState({
       displayedVariants: displayedVariants,
       sortedBy: value,
-      sortedByOrder: sortedByOrder
+      sortedByOrder: sortedByOrder,
     });
   };
 
@@ -309,85 +318,147 @@ export class CnvTable extends React.PureComponent {
   };
 
   render() {
-    const cnvRows = [];
+    let variantsToDisplay = this.state.displayedVariants || [];
+    let tableHead = null;
+    let tableBody = null;
 
-    // const variantsToDisplay = this.state.displayedVariants.sort(
-    //   (a, b) => a.posAbs - b.posAbs
-    // );
-    const variantsToDisplay = this.state.displayedVariants;
-    const variantsToDisplaySliced = this.state.displayedVariants.slice(
-      this.state.tablePage * PAGE_SIZE,
-      (this.state.tablePage + 1) * PAGE_SIZE
-    );
-
-    variantsToDisplaySliced.forEach((variant) => {
-      if (this.state.tableType === "wakhan") {
-        cnvRows.push(
+    if (this.state.tableType === "wakhan") {
+      tableHead = (
+        <thead>
           <tr>
-            <td>{variant.chr}</td>
-            <td>{variant.startStr}</td>
-            <td>{variant.endStr}</td>
-            <td>{this.formatCell(variant.hp1Coverage, ".2f")}</td>
-            <td>{this.formatCell(variant.hp1CopyNumber, ".1f")}</td>
-            <td>{this.formatCell(variant.hp1Confidence, ".3f")}</td>
-            <td>{this.formatCell(variant.hp2Coverage, ".2f")}</td>
-            <td>{this.formatCell(variant.hp2CopyNumber, ".1f")}</td>
-            <td>{this.formatCell(variant.hp2Confidence, ".3f")}</td>
-            <td>{this.formatCell(variant.total_cn, ".1f")}</td>
-            <td className="wakhan-breakpoints">{variant.breakpoints}</td>
-            <td className="text-center">
-              <i
-                className="fa fa-eye fas px-1 pointer"
-                onClick={() =>
-                  this.goToHiglass(variant.chr, variant.start, variant.end)
-                }
-              ></i>
-            </td>
+            <th onClick={() => this.sortTable("chr")}>
+              {LABELS.cnvTable.columns.chr}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("start")}>
+              {LABELS.cnvTable.columns.start}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("end")}>
+              {LABELS.cnvTable.columns.end}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp1Coverage")}>
+              HP1 Coverage <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp1CopyNumber")}>
+              HP1 CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp1Confidence")}>
+              HP1 Conf <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp2Coverage")}>
+              HP2 Coverage <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp2CopyNumber")}>
+              HP2 CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("hp2Confidence")}>
+              HP2 Conf <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("total_cn")}>
+              Total CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th>{LABELS.cnvTable.columns.breakpoints}</th>
           </tr>
-        );
-        return;
-      }
-
-      cnvRows.push(
-        <tr>
-          <td>{variant.chr}</td>
-          <td>{variant.startStr}</td>
-          <td>{variant.endStr}</td>
-          <td>{variant.major_cn}</td>
-          <td>{variant.minor_cn}</td>
-          <td>{variant.total_cn}</td>
-          <td>{variant.rdr}</td>
-          <td>{variant.baf}</td>
-          <td className="text-center">
-            <i
-              className="fa fa-eye fas px-1 pointer"
-              onClick={() =>
-                this.goToHiglass(variant.chr, variant.start, variant.end)
-              }
-            ></i>
-          </td>
-        </tr>
+        </thead>
       );
-    });
 
-    const tbody =
-      cnvRows.length > 0 ? (
-        <tbody>{cnvRows}</tbody>
-      ) : (
+      const pageStart = this.state.tablePage * PAGE_SIZE;
+      const pageEnd = pageStart + PAGE_SIZE;
+      const pageVariants = variantsToDisplay.slice(pageStart, pageEnd);
+
+      tableBody = (
+        <tbody>
+          {pageVariants.map((v, i) => (
+            <tr key={`wakhan-${v.chr}-${v.start}-${i}`}>
+              <td>{v.chr}</td>
+              <td>{v.startStr}</td>
+              <td>{v.endStr}</td>
+              <td>{this.formatCell(v.hp1Coverage)}</td>
+              <td>{this.formatCell(v.hp1CopyNumber, ".2f")}</td>
+              <td>{this.formatCell(v.hp1Confidence, ".3f")}</td>
+              <td>{this.formatCell(v.hp2Coverage)}</td>
+              <td>{this.formatCell(v.hp2CopyNumber, ".2f")}</td>
+              <td>{this.formatCell(v.hp2Confidence, ".3f")}</td>
+              <td>{this.formatCell(v.total_cn, ".2f")}</td>
+              <td style={{ maxWidth: "220px", wordBreak: "break-word" }}>{v.breakpoints}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    } else {
+      tableHead = (
+        <thead>
+          <tr>
+            <th onClick={() => this.sortTable("chr")}>
+              {LABELS.cnvTable.columns.chr}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("start")}>
+              {LABELS.cnvTable.columns.start}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("end")}>
+              {LABELS.cnvTable.columns.end}{" "}
+              <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("major_cn")}>
+              Major CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("minor_cn")}>
+              Minor CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("total_cn")}>
+              Total CN <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("rdr")}>
+              RDR <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+            <th onClick={() => this.sortTable("baf")}>
+              BAF <i className="fa fa-fw fa-sort fas text-muted"></i>
+            </th>
+          </tr>
+        </thead>
+      );
+
+      const pageStart = this.state.tablePage * PAGE_SIZE;
+      const pageEnd = pageStart + PAGE_SIZE;
+      const pageVariants = variantsToDisplay.slice(pageStart, pageEnd);
+
+      tableBody = (
+        <tbody>
+          {pageVariants.map((v, i) => (
+            <tr key={`hiscanner-${v.chr}-${v.start}-${i}`}>
+              <td>{v.chr}</td>
+              <td>{v.startStr}</td>
+              <td>{v.endStr}</td>
+              <td>{this.formatCell(v.major_cn, ".2f")}</td>
+              <td>{this.formatCell(v.minor_cn, ".2f")}</td>
+              <td>{this.formatCell(v.total_cn, ".2f")}</td>
+              <td>{this.formatCell(v.rdr, ".3f")}</td>
+              <td>{this.formatCell(v.baf, ".3f")}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    if (!variantsToDisplay || variantsToDisplay.length === 0) {
+      tableBody = (
         <tbody>
           <tr>
-            <td colSpan={this.state.tableType === "wakhan" ? 12 : 9} className="text-center p-5">
+            <td colSpan="11" className="text-center">
               <span className="text-secondary">
                 <i className="fa fa-info-circle fas"></i>
               </span>
               <br />
-              <span>
-                Please upload the visualization output file
-              </span>
+              <span>Please upload the visualization output file</span>
             </td>
           </tr>
         </tbody>
       );
+    }
 
     const navButtons = [];
 
@@ -396,7 +467,7 @@ export class CnvTable extends React.PureComponent {
       (this.state.tablePage + 1) * PAGE_SIZE <= variantsToDisplay.length
     ) {
       navButtons.push(
-        <button className="btn btn-primary btn-sm" onClick={this.nextPage}>
+        <button className="btn btn-primary btn-sm" onClick={this.nextPage} key="next-btn">
           {LABELS.cnvTable.nextButton}
         </button>
       );
@@ -407,6 +478,7 @@ export class CnvTable extends React.PureComponent {
         <button
           className="btn btn-primary btn-sm mx-2"
           onClick={this.previousPage}
+          key="prev-btn"
         >
           {LABELS.cnvTable.previousButton}
         </button>
@@ -431,10 +503,38 @@ export class CnvTable extends React.PureComponent {
               <div className="my-1" style={{ color: UI_COLORS.uploaderTitleColor }}>
                 {LABELS.uploader.title}
               </div>
-              <div className="small mb-1" style={{ color: UI_COLORS.uploaderSubtitleColor }}>
-                {LABELS.uploader.subtitle}
+              <div className="d-inline-flex flex-row align-items-center justify-content-center my-2 p-2 rounded border bg-light">
+                <span className="mr-3 font-weight-bold" style={{ fontSize: "14px", color: UI_COLORS.uploaderSubtitleColor }}>
+                  {LABELS.uploader.centromereBuildTitle || "Centromere Masking Build:"}
+                </span>
+                {["GRCh38", "GRCh37", "CHM13"].map((build) => {
+                  const isAvailable = this.state.availableCentromereBuilds
+                    ? this.state.availableCentromereBuilds[build] !== false
+                    : true;
+                  return (
+                    <label
+                      key={build}
+                      className={`mr-3 mb-0 d-inline-flex align-items-center ${!isAvailable ? "text-muted" : ""}`}
+                      style={{ cursor: isAvailable ? "pointer" : "not-allowed" }}
+                      title={!isAvailable ? "File not included in upload" : `Show ${build} centromere regions`}
+                    >
+                      <input
+                        type="radio"
+                        name="centromere-build-selector"
+                        value={build}
+                        checked={this.state.selectedCentromereBuild === build}
+                        disabled={!isAvailable}
+                        onChange={() => this.handleCentromereBuildChange(build)}
+                        className="mr-1"
+                      />
+                      <span className="font-weight-bold">{build}</span>
+                    </label>
+                  );
+                })}
               </div>
-              <Uploader populateTable={(d) => this.populateTable(d)} />
+              <div>
+                <Uploader populateTable={(d) => this.populateTable(d)} />
+              </div>
             </div>
           </div>
         </div>
@@ -459,10 +559,8 @@ export class CnvTable extends React.PureComponent {
           <div className="col-12">
             <div className="table-responsive-lg">
               <table className="table table-hover table-sm">
-                <thead className="sticky-table-header bg-white">
-                  {this.state.tableType === "wakhan" ? this.renderWakhanHeader() : this.renderHiScannerHeader()}
-                </thead>
-                {tbody}
+                {tableHead}
+                {tableBody}
               </table>
             </div>
           </div>

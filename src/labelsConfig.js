@@ -18,6 +18,12 @@ export const LABELS = {
   uploader: {
     title: "Wakhan Compressed Output files (required)",
     subtitle: "Include grch38.cen_coord.curated.bed to show masked regions",
+    centromereBuildTitle: "Centromere Masking Build:",
+    buildOptions: {
+      GRCh38: "GRCh38",
+      GRCh37: "GRCh37",
+      CHM13: "CHM13",
+    },
     buttonText: "Click to upload",
   },
 
