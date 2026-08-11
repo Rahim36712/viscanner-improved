@@ -3,10 +3,9 @@
 **ViScanner** is an interactive, high-performance web visualizer for single-cell **Copy Number Alterations (CNA)**, **B-Allele Frequencies (BAF)**, **Haplotype-Specific Coverage (HP1 / HP2)**, and **Structural Variant (SV)** breakpoint exploration.
 
 [![Live Demo](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen.svg?logo=github)](https://wakhan-visualization.github.io/wakhan_visualization.github.io/)
-[![Nature Communications](https://img.shields.io/badge/Nature%20Communications-2025-0066CC.svg)](https://www.nature.com/articles/s41467-025-60446-5)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[**🌐 Live Application Demo**](https://wakhan-visualization.github.io/wakhan_visualization.github.io/) &nbsp;|&nbsp; [**📄 Read the Paper**](https://www.nature.com/articles/s41467-025-60446-5)
+[**🌐 Live Application Demo**](https://wakhan-visualization.github.io/wakhan_visualization.github.io/)
 
 ---
 
@@ -80,40 +79,8 @@ npm run deploy
 
 ## 🚀 How to Commit and Push Changes to GitHub
 
-### Standard Push (Single Repository)
-To commit your changes and push to GitHub in one line:
+To commit your changes and push to GitHub in one command line:
 ```bash
 git add . ; git commit -m "Describe your changes" ; git push origin main
 ```
-*(On Linux/macOS, replace `;` with `&&`)*
-
-### Dual-Repository Push Setup (Optional)
-If you maintain two repository remotes (e.g. `wakhan-visualization` and `Rahim36712`) and want to push to **both** simultaneously in a single command:
-
-1. **Configure `origin` to push to both remotes**:
-   ```bash
-   git remote set-url --add --push origin https://github.com/wakhan-visualization/wakhan-visualization.github.io.git
-   git remote set-url --add --push origin https://github.com/Rahim36712/viscanner-improved.git
-   ```
-
-2. **Push to both repositories simultaneously**:
-   ```bash
-   git add . ; git commit -m "Update code across both repositories" ; git push origin main
-   ```
-
----
-
-## 📜 Citation & Credits
-
-If you use **ViScanner** in your research, please cite:
-
-```bibtex
-@article{viscanner2025,
-  title={Single-cell copy number alteration profiling at scale with HiScanner},
-  journal={Nature Communications},
-  year={2025},
-  url={https://www.nature.com/articles/s41467-025-60446-5}
-}
-```
-
-Developed by **Park Lab** (Harvard Medical School) & **Kolmogorov Lab**.
+*(On Linux/macOS bash shell, you can use `git add . && git commit -m "..." && git push origin main`)*
