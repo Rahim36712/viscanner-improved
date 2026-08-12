@@ -2,7 +2,7 @@
 
 **ViScanner** is an interactive, high-performance web visualizer for single-cell **Copy Number Alterations (CNA)**, **B-Allele Frequencies (BAF)**, **Haplotype-Specific Coverage (HP1 / HP2)**, and **Structural Variant (SV)** breakpoint exploration.
 
-[![Live Demo](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen.svg?logo=github)](https://wakhan-visualization.github.io/wakhan_visualization.github.io/)
+[![Live Demo](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen.svg?logo=github)](https://wakhan-visualization.github.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [**🌐 Live Application Demo**](https://wakhan-visualization.github.io/wakhan_visualization.github.io/)
