@@ -5,7 +5,7 @@
 [![Live Demo](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen.svg?logo=github)](https://wakhan-visualization.github.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[**🌐 Live Application Demo**](https://wakhan-visualization.github.io/wakhan_visualization.github.io/)
+[**🌐 Live Application Demo**](https://wakhan-visualization.github.io/)
 
 ---
 
