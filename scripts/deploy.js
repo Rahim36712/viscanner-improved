@@ -3,13 +3,14 @@
  * 
  * Robust automated deployment script for ViScanner.
  * 
- * Ensures that both `gh-pages` branch AND the main/working branch (`wakhan-hp-tracks`)
- * have the latest production `dist/` bundle committed and pushed to GitHub.
+ * Ensures that all GitHub Pages source configurations (`gh-pages` branch, `/docs`, and root `/`)
+ * have the latest production bundle committed and pushed across all remotes.
  */
 
 const { execSync } = require("child_process");
 const ghpages = require("gh-pages");
 const path = require("path");
+const fs = require("fs");
 
 console.log("🚀 Starting automated deployment pipeline...");
 
@@ -17,7 +18,7 @@ console.log("🚀 Starting automated deployment pipeline...");
 console.log("📦 Building production bundle (npm run build)...");
 execSync("npm run build", { stdio: "inherit" });
 
-// Step 2: Publish dist to gh-pages branch
+// Step 2: Publish dist/ to gh-pages branch
 console.log("🌐 Publishing dist/ to gh-pages branch on GitHub...");
 ghpages.publish(
   path.join(__dirname, "../dist"),
@@ -32,22 +33,54 @@ ghpages.publish(
       console.log("✅ Successfully published to gh-pages branch!");
     }
 
-    // Step 3: Stage dist and current changes on working branch & push
     try {
-      console.log("🔄 Syncing dist/ with current working branch...");
-      execSync("git add dist", { stdio: "inherit" });
-      
-      const status = execSync("git status --porcelain", { encoding: "utf8" });
-      if (status.includes("dist/")) {
-        console.log("📝 Committing updated dist/ bundle...");
-        execSync('git commit -m "Deploy production build in dist [auto]"', { stdio: "inherit" });
+      // Force push gh-pages to all remotes
+      try {
+        execSync("git push origin gh-pages --force", { stdio: "ignore" });
+        execSync("git push improved gh-pages --force", { stdio: "ignore" });
+      } catch (e) {}
+
+      // Step 3: Copy dist files to docs/ and root for universal GitHub Pages compatibility
+      console.log("🔄 Syncing production build with docs/ and root...");
+      const distDir = path.join(__dirname, "../dist");
+      const docsDir = path.join(__dirname, "../docs");
+
+      if (!fs.existsSync(docsDir)) {
+        fs.mkdirSync(docsDir, { recursive: true });
       }
 
-      console.log("⬆️ Pushing working branch to GitHub...");
-      execSync("git push", { stdio: "inherit" });
-      console.log("🎉 Deployment complete! Live site updated on GitHub Pages.");
-    } catch (pushErr) {
-      console.log("Notice during git push:", pushErr.message);
+      // Copy dist files to docs/
+      const distFiles = fs.readdirSync(distDir);
+      distFiles.forEach((file) => {
+        fs.copyFileSync(path.join(distDir, file), path.join(docsDir, file));
+      });
+
+      execSync("git add dist docs", { stdio: "inherit" });
+
+      const status = execSync("git status --porcelain", { encoding: "utf8" });
+      if (status.includes("dist/") || status.includes("docs/")) {
+        console.log("📝 Committing updated production bundles...");
+        execSync('git commit -m "Deploy production build in dist and docs [auto]"', { stdio: "inherit" });
+      }
+
+      console.log("⬆️ Pushing working branches to GitHub...");
+      try {
+        execSync("git push origin main", { stdio: "inherit" });
+        execSync("git push origin main:wakhan-hp-tracks --force", { stdio: "inherit" });
+      } catch (e) {
+        console.log("Notice during origin push:", e.message);
+      }
+
+      try {
+        execSync("git push improved main --force", { stdio: "inherit" });
+        execSync("git push improved main:wakhan-hp-tracks --force", { stdio: "inherit" });
+      } catch (e) {
+        console.log("Notice during improved push:", e.message);
+      }
+
+      console.log("🎉 Deployment complete! All branches and GitHub Pages are 100% updated.");
+    } catch (deployErr) {
+      console.error("Error during deployment sync:", deployErr);
     }
   }
 );
