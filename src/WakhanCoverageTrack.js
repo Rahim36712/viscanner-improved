@@ -737,7 +737,7 @@ function WakhanCoverageTrack(HGC, ...args) {
       safeMoveTo(this.axisGraphics, leftAxisX, centerY, "drawAxes:centerMove");
       safeLineTo(this.axisGraphics, rightAxisX, centerY, "drawAxes:centerLine");
 
-      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 1);
+      this.axisGraphics.lineStyle(1, this.HGC.utils.colorToHex(AXIS_COLOR), 0);
       safeMoveTo(this.axisGraphics, leftAxisX, top, "drawAxes:leftMove");
       safeLineTo(this.axisGraphics, leftAxisX, bottomY, "drawAxes:leftLine");
       safeMoveTo(this.axisGraphics, rightAxisX, top, "drawAxes:rightMove");

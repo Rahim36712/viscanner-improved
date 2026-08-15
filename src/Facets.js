@@ -6,7 +6,7 @@ import { GeneSearchBox } from "./GeneSearchBox";
 import { GeneFilterControl } from "./GeneFilterControl";
 import { ChromosomeInfo } from "higlass/dist/hglib";
 import { resetHiglassView, scheduleFitToContent } from "./higlassLayout";
-import { exportSvgAsPdf } from "./pdfExport";
+import { exportSvgAsPdf, exportPngBlobAsPdf } from "./pdfExport";
 import { LABELS } from "./labelsConfig";
 // import Select from "react-select";
 
@@ -46,23 +46,51 @@ export class Facets extends React.PureComponent {
       return;
     }
 
+    const hiddenProps = [];
+    const hideTrackBorders = () => {
+      try {
+        if (!hgc.api || typeof hgc.api.getViewConfig !== "function") return;
+        const viewConfig = hgc.api.getViewConfig();
+        const views = viewConfig.views || [];
+        views.forEach((view) => {
+          const positions = ["top", "center", "bottom", "left", "right"];
+          positions.forEach((pos) => {
+            const tracks = (view.tracks && view.tracks[pos]) || [];
+            tracks.forEach((tConf) => {
+              const track = hgc.api.getTrackObject(view.uid, tConf.uid);
+              if (!track) return;
+              ["pBorder", "pAxis", "axisGraphics"].forEach((prop) => {
+                if (track[prop] && typeof track[prop].visible === "boolean") {
+                  hiddenProps.push({ obj: track[prop], prevVisible: track[prop].visible });
+                  track[prop].visible = false;
+                }
+              });
+            });
+          });
+        });
+      } catch (e) {}
+    };
+
     try {
+      hideTrackBorders();
       const svg = hgc.api.exportAsSvg();
       await exportSvgAsPdf(svg, "viscanner-cohort.pdf");
     } catch (error) {
       console.error("Failed to export the visualization as a PDF:", error);
     } finally {
-      // Force HiGlass to re-render all Pixi tracks so the on-screen
-      // display is restored after the offscreen captures.
+      hiddenProps.forEach(({ obj, prevVisible }) => {
+        try {
+          obj.visible = prevVisible;
+        } catch (e) {}
+      });
+
       requestAnimationFrame(() => {
         try {
           if (hgc.pixiStage && hgc.pixiRenderer) {
             hgc.pixiRenderer.render(hgc.pixiStage);
           }
-          // Trigger a resize which forces all tracks to redraw
           window.dispatchEvent(new Event("resize"));
         } catch (e) {
-          // Last resort: force a resize event to trigger redraws
           window.dispatchEvent(new Event("resize"));
         }
       });

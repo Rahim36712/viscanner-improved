@@ -50,6 +50,99 @@ function downloadBlob(blob, filename) {
 }
 
 /**
+ * Sanitizes HiGlass SVG markup for PDF rendering by removing unwanted
+ * container bounding boxes, zero-opacity track outline rects, and enforcing
+ * explicit stroke="none" fill="none" presentation attributes where needed.
+ */
+export function sanitizeSvgForPdf(svgMarkup) {
+  if (!svgMarkup || typeof svgMarkup !== "string") {
+    return svgMarkup;
+  }
+
+  let cleaned = svgMarkup;
+
+  // Completely strip unthemed layout/container <rect> tags (such as fill-opacity="0")
+  cleaned = cleaned.replace(/<rect[^>]*fill-opacity=["']0["'][^>]*>(?:\s*<\/rect>)?/gi, "");
+  cleaned = cleaned.replace(/<rect[^>]*fill-opacity=["']0["'][^>]*\/>/gi, "");
+
+  // Convert any remaining rect without fill/stroke to explicit stroke="none" fill="none"
+  cleaned = cleaned.replace(/<rect([^>]*)>/gi, (match, attrs) => {
+    if (!attrs.includes("stroke=") && !attrs.includes("fill=")) {
+      return `<rect${attrs} stroke="none" fill="none">`;
+    }
+    return match;
+  });
+
+  return cleaned;
+}
+
+/**
+ * Convert HiGlass high-resolution PNG Blob into a crisp PDF file.
+ * Captures 1-to-1 pixel-perfect canvas rendering with zero border line artifacts.
+ */
+export function exportPngBlobAsPdf(pngBlob, filename = "viscanner-cohort.pdf") {
+  return new Promise((resolve, reject) => {
+    if (!pngBlob) {
+      return reject(new Error("No PNG blob provided for PDF export."));
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const dataUrl = reader.result;
+        const base64Data = dataUrl.split(",")[1];
+        const binaryString = window.atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          try {
+            // Convert px dimensions to PDF pt (72 pt / 96 px)
+            const ptWidth = Math.round(img.width * (72 / 96));
+            const ptHeight = Math.round(img.height * (72 / 96));
+
+            const pdf = new PDFDocument({
+              autoFirstPage: false,
+              margin: 0,
+              size: [ptWidth, ptHeight],
+              compress: true,
+            });
+            const stream = pdf.pipe(blobStream());
+
+            stream.on("finish", () => {
+              try {
+                const blob = stream.toBlob("application/pdf");
+                downloadBlob(blob, filename);
+                resolve(blob);
+              } catch (err) {
+                reject(err);
+              }
+            });
+            stream.on("error", reject);
+
+            pdf.addPage({ size: [ptWidth, ptHeight], margin: 0 });
+            pdf.image(bytes.buffer, 0, 0, { width: ptWidth, height: ptHeight });
+            pdf.end();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error("Failed to load PNG image for PDF conversion."));
+        img.src = dataUrl;
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read PNG Blob for PDF export."));
+    reader.readAsDataURL(pngBlob);
+  });
+}
+
+/**
  * Convert HiGlass' SVG export into a PDF without rasterizing the SVG as a whole.
  * SVG paths, labels, axes, and shapes remain PDF vector content. Pixi layers that
  * HiGlass exposes as embedded images remain embedded at the track export's
@@ -61,7 +154,8 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
     return Promise.reject(new Error("The visualization did not return an SVG export."));
   }
 
-  const { width, height } = getSvgSize(svgMarkup);
+  const cleanedSvg = sanitizeSvgForPdf(svgMarkup);
+  const { width, height } = getSvgSize(cleanedSvg);
 
   return new Promise((resolve, reject) => {
     // Yield execution to event loop so UI state (e.g. loading spinner) updates before PDF compilation
@@ -87,7 +181,7 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
         stream.on("error", reject);
 
         pdf.addPage({ size: [width, height], margin: 0 });
-        SVGtoPDF(pdf, svgMarkup, 0, 0, {
+        SVGtoPDF(pdf, cleanedSvg, 0, 0, {
           assumePt: false,
           height,
           precision: 6,

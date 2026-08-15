@@ -427,6 +427,31 @@ function ScannerResultTrackPatched(HGC, ...args) {
   instance.createLegendGraphics = function patchedCreateLegendGraphics(maxValue) {
     this.legendHeight = this.dimensions[1] - 1;
     this.legendVerticalOffset = 1;
+
+    if (this.legendUtils) {
+      const track = this;
+      if (!this._patchedLegendUtils) {
+        this._patchedLegendUtils = true;
+        const bounds = getPlotBounds(track);
+
+        const origResetLegend = this.legendUtils.resetLegend.bind(this.legendUtils);
+        this.legendUtils.resetLegend = function (legendGraphics) {
+          legendGraphics.removeChildren();
+          legendGraphics.clear();
+          legendGraphics.beginFill(this.HGC.utils.colorToHex("#ffffff"));
+          legendGraphics.drawRect(0, 0, this.legendWidth, track.dimensions[1]);
+          this.currentLegendLevels = [];
+        };
+
+        const origDrawHoriz = this.legendUtils.drawHorizontalLines.bind(this.legendUtils);
+        this.legendUtils.drawHorizontalLines = function (tileGraphics, from, to) {
+          const plotLeft = getPlotBounds(track).left;
+          // Start horizontal lines at plot canvas left boundary (plotLeft) so no stray line extends into left margin
+          return origDrawHoriz(tileGraphics, Math.max(from, plotLeft), to);
+        };
+      }
+    }
+
     return originalCreateLegendGraphics(maxValue);
   };
 
