@@ -41,23 +41,15 @@ ghpages.publish(
       } catch (e) {}
 
       // Step 3: Copy dist files to docs/ and root for universal GitHub Pages compatibility
-      console.log("🔄 Syncing production build with docs/ and root...");
-      const distDir = path.join(__dirname, "../dist");
-      const docsDir = path.join(__dirname, "../docs");
+      console.log("🔄 Syncing production build with root, docs/, and gh-pages...");
+      execSync("node scripts/sync-bundles.js", { stdio: "inherit" });
 
-      if (!fs.existsSync(docsDir)) {
-        fs.mkdirSync(docsDir, { recursive: true });
-      }
-
-      // Copy dist files to docs/
-      fs.cpSync(distDir, docsDir, { recursive: true });
-
-      execSync("git add dist docs examples", { stdio: "inherit" });
+      execSync("git add index.html bundle.js bundle.*.js bundle.*.txt favicon.ico dist docs examples scripts", { stdio: "inherit" });
 
       const status = execSync("git status --porcelain", { encoding: "utf8" });
-      if (status.includes("dist/") || status.includes("docs/")) {
-        console.log("📝 Committing updated production bundles...");
-        execSync('git commit -m "Deploy production build in dist and docs [auto]"', { stdio: "inherit" });
+      if (status.includes("dist/") || status.includes("docs/") || status.includes("index.html") || status.includes("bundle")) {
+        console.log("📝 Committing updated production bundles in root, dist, and docs...");
+        execSync('git commit -m "Deploy latest production build to root, dist, and docs [auto]"', { stdio: "inherit" });
       }
 
       console.log("⬆️ Pushing working branches to GitHub...");
