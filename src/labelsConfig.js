@@ -25,6 +25,8 @@ export const LABELS = {
       CHM13: "CHM13",
     },
     buttonText: "Click to upload",
+    orDividerText: "or",
+    exampleButtonText: "Load example data",
   },
 
   // Facets / Navigation Section

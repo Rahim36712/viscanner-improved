@@ -50,12 +50,9 @@ ghpages.publish(
       }
 
       // Copy dist files to docs/
-      const distFiles = fs.readdirSync(distDir);
-      distFiles.forEach((file) => {
-        fs.copyFileSync(path.join(distDir, file), path.join(docsDir, file));
-      });
+      fs.cpSync(distDir, docsDir, { recursive: true });
 
-      execSync("git add dist docs", { stdio: "inherit" });
+      execSync("git add dist docs examples", { stdio: "inherit" });
 
       const status = execSync("git status --porcelain", { encoding: "utf8" });
       if (status.includes("dist/") || status.includes("docs/")) {

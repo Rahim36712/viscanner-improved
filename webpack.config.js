@@ -30,11 +30,18 @@ module.exports = {
     }),
     new HtmlWebpackPlugin({
       template: "src/index.html", // to import index.html file inside index.js
-      favicon: "src/favicon.ico"
-    })
+      favicon: "src/favicon.ico",
+    }),
   ],
   devServer: {
-    port: 3030, // you can change the port
+    port: 3030,
+    static: [
+      path.join(__dirname, "public"),
+      {
+        directory: path.join(__dirname, "examples"),
+        publicPath: "/examples",
+      },
+    ],
   },
   module: {
     rules: [
@@ -50,9 +57,8 @@ module.exports = {
         use: ["style-loader", "css-loader", "sass-loader"],
       },
       {
-        test: /\.(png|woff|woff2|eot|ttf|svg)$/, // to import images and fonts
-        loader: "url-loader",
-        options: { limit: false },
+        test: /\.(png|woff|woff2|eot|ttf|svg|zip)$/, // to import images, fonts, and data archives
+        type: "asset/resource",
       },
     ],
   },

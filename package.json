@@ -54,7 +54,7 @@
   },
   "scripts": {
     "start": "webpack serve --mode development",
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && webpack --mode production",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && webpack --mode production && node scripts/copy-assets.js",
     "test": "react-scripts test --watchAll=false",
     "deploy": "node scripts/deploy.js",
     "test:e2e": "playwright test",

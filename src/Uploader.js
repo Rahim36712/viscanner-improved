@@ -754,24 +754,74 @@ const rejectStyle = {
   borderColor: "#ff1744",
 };
 
+export async function loadExampleData(props) {
+  const spinner = document.getElementById("upload-spinner");
+  const overlay = document.getElementById("overlay");
+  if (spinner) {
+    spinner.classList.remove("collapse");
+  }
+  if (overlay) {
+    overlay.style.display = "block";
+  }
+
+  try {
+    const { getExampleEntryTexts } = await import("./exampleData");
+    const entryTexts = await getExampleEntryTexts();
+    parseUploadedEntryTexts(entryTexts, props);
+    setTimeout(() => {
+      resetUploadSpinner();
+    }, 1500);
+  } catch (error) {
+    showUploadError(error.message || "Failed to load example data.");
+  }
+}
+
 const Uploader = (props) => {
+  const [loadingExample, setLoadingExample] = React.useState(false);
+
   const onDrop = useCallback((acceptedFiles) => {
     readUploadedFiles(acceptedFiles, props)
       .then(() => {
         setTimeout(() => {
           resetUploadSpinner();
-        }, "2000");
+        }, 2000);
       })
       .catch((error) => {
         showUploadError(error.message || "ViScanner could not read the uploaded file.");
       });
-  }, []);
+  }, [props]);
 
   const onDropAccepted = () => {
     const spinner = document.getElementById("upload-spinner");
-    spinner.classList.remove("collapse");
-    document.getElementById("overlay").style.display = "block";
+    if (spinner) spinner.classList.remove("collapse");
+    const overlay = document.getElementById("overlay");
+    if (overlay) overlay.style.display = "block";
   };
+
+  const handleLoadExample = useCallback(async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setLoadingExample(true);
+    const spinner = document.getElementById("upload-spinner");
+    if (spinner) spinner.classList.remove("collapse");
+    const overlay = document.getElementById("overlay");
+    if (overlay) overlay.style.display = "block";
+
+    try {
+      const { getExampleEntryTexts } = await import("./exampleData");
+      const entryTexts = await getExampleEntryTexts();
+      parseUploadedEntryTexts(entryTexts, props);
+      setTimeout(() => {
+        resetUploadSpinner();
+        setLoadingExample(false);
+      }, 1500);
+    } catch (error) {
+      setLoadingExample(false);
+      showUploadError(error.message || "Failed to load example data.");
+    }
+  }, [props]);
 
   const { getRootProps, getInputProps, isFocused, isDragAccept, isDragReject } =
     useDropzone({
@@ -796,10 +846,17 @@ const Uploader = (props) => {
   );
 
   return (
-    <div className="d-inline-block">
+    <div className="d-flex flex-column align-items-center">
       <div {...getRootProps({ style })}>
         <input {...getInputProps()} />
-        <button className="btn btn-outline-primary" style={{ color: UI_COLORS.uploaderButtonText, borderColor: UI_COLORS.uploaderButtonBorder }}>
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          style={{
+            color: UI_COLORS.uploaderButtonText,
+            borderColor: UI_COLORS.uploaderButtonBorder,
+          }}
+        >
           <i
             id="upload-spinner"
             className="fas fa fa-spinner fa-spin mr-1 collapse"
@@ -807,8 +864,32 @@ const Uploader = (props) => {
           {LABELS.uploader.buttonText}
         </button>
       </div>
+      <div className="my-1 text-muted" style={{ fontSize: "14px" }}>
+        {LABELS.uploader.orDividerText || "or"}
+      </div>
+      <button
+        type="button"
+        id="load-example-button"
+        className="btn btn-outline-primary"
+        onClick={handleLoadExample}
+        disabled={loadingExample}
+        style={{
+          color: UI_COLORS.uploaderButtonText,
+          borderColor: UI_COLORS.uploaderButtonBorder,
+          minWidth: "160px",
+        }}
+      >
+        <i
+          id="example-spinner"
+          className={`fas fa fa-spinner fa-spin mr-1 ${loadingExample ? "" : "collapse"}`}
+        ></i>
+        {loadingExample
+          ? "Loading..."
+          : LABELS.uploader.exampleButtonText || "Load example data"}
+      </button>
     </div>
   );
 };
 
+export { readZip, readRawFiles, readUploadedFiles, parseUploadedEntryTexts, resetUploadSpinner, showUploadError };
 export default Uploader;

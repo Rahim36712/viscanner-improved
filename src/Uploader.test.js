@@ -265,4 +265,41 @@ describe("Uploader Data Parsers and Utilities", () => {
       expect(copyNumData[0]).toEqual(["chr1", 100, 500, 2.0, 1.0, 3.0, 22.0, NaN, "Wakhan"]);
     });
   });
+
+  describe("loadExampleData", () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    test("successfully loads and parses example data", async () => {
+      const mockPopulateTable = jest.fn();
+      const props = {
+        populateTable: mockPopulateTable,
+      };
+
+      const { loadExampleData } = require("./Uploader");
+      await loadExampleData(props);
+
+      expect(mockPopulateTable).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "wakhan",
+          rows: expect.any(Array),
+        })
+      );
+    });
+
+    test("handles errors gracefully by alerting user", async () => {
+      const alertMock = jest.spyOn(window, "alert").mockImplementation(() => {});
+      jest.doMock("./exampleData", () => ({
+        getExampleEntryTexts: jest.fn().mockRejectedValue(new Error("Decompression error")),
+      }));
+
+      const { loadExampleData } = require("./Uploader");
+      await loadExampleData({});
+
+      expect(alertMock).toHaveBeenCalledWith(
+        expect.stringContaining("Decompression error")
+      );
+    });
+  });
 });
