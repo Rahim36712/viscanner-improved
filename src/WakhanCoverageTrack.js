@@ -11,6 +11,7 @@ import {
 } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 import { LABELS, SV_CONFIG, TRACK_COLORS } from "./labelsConfig";
+import { DEFAULT_SETTINGS } from "./defaultSettings";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -39,14 +40,14 @@ const LOH_REGION_BORDER_ALPHA = 0.7;
 const COVERAGE_DOT_SIZE = 1.6;
 const COVERAGE_TICK_STEP = 30;
 const SV_MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
-const DEFAULT_SV_MODE = "matched";
+const DEFAULT_SV_MODE = DEFAULT_SETTINGS.svMode ?? "matched";
 const DEFAULT_VISIBLE_TYPES = {
-  DEL: true,
-  INV: true,
-  INS: true,
-  BND: true,
-  DUP: true,
-  sBND: true,
+  DEL: DEFAULT_SETTINGS.svTypes?.DEL ?? false,
+  INV: DEFAULT_SETTINGS.svTypes?.INV ?? false,
+  INS: DEFAULT_SETTINGS.svTypes?.INS ?? false,
+  BND: DEFAULT_SETTINGS.svTypes?.BND ?? false,
+  DUP: DEFAULT_SETTINGS.svTypes?.DUP ?? false,
+  sBND: DEFAULT_SETTINGS.svTypes?.sBND ?? false,
 };
 const SV_TYPE_COLORS = SV_CONFIG.TYPE_COLORS;
 
@@ -278,12 +279,12 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.svVariants = [];
       this.svMatchedIds = new Set();
       this.svHitRegions = [];
-      this.showHp1 = this.options.showHp1 !== false;
-      this.showHp2 = this.options.showHp2 !== false;
-      this.showCoverage = this.showCoverage !== false;
-      this.showSvBreakpoints = this.options.showSvBreakpoints !== false;
-      this.showMaskedRegions = this.options.showMaskedRegions === true;
-      this.showLohRegions = this.options.showLohRegions !== false;
+      this.showHp1 = this.options.showHp1 !== undefined ? Boolean(this.options.showHp1) : (DEFAULT_SETTINGS.showHp1 ?? false);
+      this.showHp2 = this.options.showHp2 !== undefined ? Boolean(this.options.showHp2) : (DEFAULT_SETTINGS.showHp2 ?? false);
+      this.showCoverage = this.options.showCoverage !== undefined ? Boolean(this.options.showCoverage) : (DEFAULT_SETTINGS.showCoveragePoints ?? false);
+      this.showSvBreakpoints = this.options.showSvBreakpoints !== undefined ? Boolean(this.options.showSvBreakpoints) : (DEFAULT_SETTINGS.showSvLinesInCopyNumber ?? false);
+      this.showMaskedRegions = this.options.showMaskedRegions !== undefined ? Boolean(this.options.showMaskedRegions) : (DEFAULT_SETTINGS.showMaskedRegions ?? false);
+      this.showLohRegions = this.options.showLohRegions !== undefined ? Boolean(this.options.showLohRegions) : (DEFAULT_SETTINGS.showLohRegions ?? false);
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
       this.visibleSvTypes = {
         ...DEFAULT_VISIBLE_TYPES,

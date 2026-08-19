@@ -667,6 +667,10 @@ function parseUploadedEntryTexts(entryTexts, props) {
     updateBafSnpTrack(parseSnpData(entryTexts["baf.csv"], ","));
   }
 
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("viscanner:reset-defaults"));
+  }
+
   scheduleFitToContent({ resetLocation: true, preserveLocation: false, delay: 250 });
 }
 

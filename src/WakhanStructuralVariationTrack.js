@@ -4,6 +4,7 @@ import { format } from "d3-format";
 import { getPlotBounds, mapTrackX, getGlobalMasterChromBounds } from "./plotBounds";
 import { createHighResBase64Extractor } from "./pdfExport";
 import { LABELS, SV_CONFIG, TRACK_COLORS } from "./labelsConfig";
+import { DEFAULT_SETTINGS } from "./defaultSettings";
 import {
   isFiniteNumber,
   isValidVariant,
@@ -21,14 +22,14 @@ const CHROM_BAND_COLOR = TRACK_COLORS.chromBand;
 const ARC_ALPHA = SV_CONFIG.ARC_ALPHA;
 const MARKER_ALPHA = SV_CONFIG.MARKER_ALPHA;
 const DEFAULT_VISIBLE_TYPES = {
-  DEL: true,
-  INV: true,
-  INS: true,
-  BND: true,
-  DUP: true,
-  sBND: true,
+  DEL: DEFAULT_SETTINGS.svTypes?.DEL ?? false,
+  INV: DEFAULT_SETTINGS.svTypes?.INV ?? false,
+  INS: DEFAULT_SETTINGS.svTypes?.INS ?? false,
+  BND: DEFAULT_SETTINGS.svTypes?.BND ?? false,
+  DUP: DEFAULT_SETTINGS.svTypes?.DUP ?? false,
+  sBND: DEFAULT_SETTINGS.svTypes?.sBND ?? false,
 };
-const DEFAULT_SV_MODE = "matched";
+const DEFAULT_SV_MODE = DEFAULT_SETTINGS.svMode ?? "matched";
 
 export function normalizeHpFilter(value) {
   return value === "1" || value === "2" ? value : null;
@@ -85,7 +86,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.currentVariants = [];
       this.hitRegions = [];
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
-      this.showTrack = this.options.showTrack !== false;
+      this.showTrack = this.options.showTrack !== undefined ? Boolean(this.options.showTrack) : (DEFAULT_SETTINGS.showHpSvTrack ?? false);
       this.hpLaneMode = this.options.hpLaneMode === true;
       this.hpFilter = normalizeHpFilter(this.options.hpFilter);
       this.visibleTypes = {

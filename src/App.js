@@ -6,11 +6,12 @@ import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
 import { fitToContent, scheduleFitToContent } from "./higlassLayout";
 import { LABELS, SV_CONFIG, UI_COLORS } from "./labelsConfig";
+import { DEFAULT_SETTINGS } from "./defaultSettings";
 
 const DEFAULT_WAKHAN_VISIBILITY = {
-  showHp1: true,
-  showHp2: true,
-  showCoverage: true,
+  showHp1: DEFAULT_SETTINGS.showHp1 ?? false,
+  showHp2: DEFAULT_SETTINGS.showHp2 ?? false,
+  showCoverage: DEFAULT_SETTINGS.showCoveragePoints ?? false,
 };
 
 const SV_TYPE_OPTIONS = Object.keys(SV_CONFIG.TYPE_COLORS).map((key) => ({
@@ -20,15 +21,15 @@ const SV_TYPE_OPTIONS = Object.keys(SV_CONFIG.TYPE_COLORS).map((key) => ({
 }));
 
 const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
-  visibility[option.key] = true;
+  visibility[option.key] = DEFAULT_SETTINGS.svTypes?.[option.key] ?? false;
   return visibility;
 }, {});
-const DEFAULT_SV_MODE = "matched";
-const DEFAULT_SHOW_HP_SV_TRACK = true;
-const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = true;
-const DEFAULT_SHOW_MASKED_REGIONS = false;
-const DEFAULT_SHOW_LOH_REGIONS = true;
-const DEFAULT_MAX_SV_SPAN = 0;
+const DEFAULT_SV_MODE = DEFAULT_SETTINGS.svMode ?? "matched";
+const DEFAULT_SHOW_HP_SV_TRACK = DEFAULT_SETTINGS.showHpSvTrack ?? false;
+const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = DEFAULT_SETTINGS.showSvLinesInCopyNumber ?? false;
+const DEFAULT_SHOW_MASKED_REGIONS = DEFAULT_SETTINGS.showMaskedRegions ?? false;
+const DEFAULT_SHOW_LOH_REGIONS = DEFAULT_SETTINGS.showLohRegions ?? false;
+const DEFAULT_MAX_SV_SPAN = DEFAULT_SETTINGS.maxSvSpan ?? 0;
 
 function updateWakhanTrackVisibility(visibility) {
   const hgc = window.hgc && window.hgc.current;
@@ -134,6 +135,12 @@ function WakhanVisibilityControls() {
   const [visibility, setVisibility] = React.useState(DEFAULT_WAKHAN_VISIBILITY);
 
   React.useEffect(() => {
+    const handleReset = () => setVisibility({ ...DEFAULT_WAKHAN_VISIBILITY });
+    window.addEventListener("viscanner:reset-defaults", handleReset);
+    return () => window.removeEventListener("viscanner:reset-defaults", handleReset);
+  }, []);
+
+  React.useEffect(() => {
     updateWakhanTrackVisibility(visibility);
   }, [visibility]);
 
@@ -189,6 +196,20 @@ function SvVisibilityControls() {
     DEFAULT_SHOW_LOH_REGIONS
   );
   const [maxSvSpan, setMaxSvSpan] = React.useState(DEFAULT_MAX_SV_SPAN);
+
+  React.useEffect(() => {
+    const handleReset = () => {
+      setVisibility({ ...DEFAULT_SV_VISIBILITY });
+      setSvMode(DEFAULT_SV_MODE);
+      setShowHpSvTrack(DEFAULT_SHOW_HP_SV_TRACK);
+      setShowSvLinesInCopyNumber(DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER);
+      setShowMaskedRegions(DEFAULT_SHOW_MASKED_REGIONS);
+      setShowLohRegions(DEFAULT_SHOW_LOH_REGIONS);
+      setMaxSvSpan(DEFAULT_MAX_SV_SPAN);
+    };
+    window.addEventListener("viscanner:reset-defaults", handleReset);
+    return () => window.removeEventListener("viscanner:reset-defaults", handleReset);
+  }, []);
 
   const handleMaxSvSpanChange = (e) => {
     const value = e.target.value;
