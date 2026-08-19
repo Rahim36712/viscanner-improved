@@ -32,11 +32,14 @@ ViScanner is an interactive, web-based genomic visualization tool designed for s
 
 ## Interface Previews
 
-### Multi-Track Genome Visualizer & Segment Browser
-![ViScanner Interface Preview](docs/images/table_preview.png)
+### Upload Interface & WAKHAN Segment Browser
+![Upload Interface and Segment Browser](docs/images/table_preview.png)
 
-### Structural Variation & Mirrored Haplotype Tracks
-![ViScanner Multi-Track Visualizer](docs/images/tracks_preview.png)
+### Whole-Genome Multi-Track Visualizer (HP1, HP2, BAF & SV Arcs)
+![Whole-Genome Multi-Track Visualizer](docs/images/tracks_preview.png)
+
+### Zoomed Genomic Region & Breakpoint Inspection
+![Zoomed Region and Breakpoint Inspection](docs/images/zoomed_region_preview.png)
 
 ---
 

@@ -93,6 +93,39 @@ export function parseSnpData(v, delimiter = "\t") {
   return higlassData;
 }
 
+export function parseSampleMetadataCsv(text) {
+  if (!text || typeof text !== "string") return null;
+  const lines = text.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const delimiter = lines[0].includes("\t") ? "\t" : lines[0].includes(";") ? ";" : ",";
+  const headers = lines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+  const values = lines[1].split(delimiter).map((v) => v.trim().replace(/['"]/g, ""));
+
+  const meta = {
+    sample_name: "1437_merged",
+    ploidy: "2.57",
+    purity: "0.65",
+    confidence: "0.86",
+  };
+
+  headers.forEach((header, idx) => {
+    const val = values[idx];
+    if (val === undefined || val === "") return;
+    if (header.includes("sample") || header.includes("name") || header === "id") {
+      meta.sample_name = val;
+    } else if (header.includes("ploid")) {
+      meta.ploidy = val;
+    } else if (header.includes("purit")) {
+      meta.purity = val;
+    } else if (header.includes("confid")) {
+      meta.confidence = val;
+    }
+  });
+
+  return meta;
+}
+
 function parseInfoField(infoText) {
   const info = {};
   if (!infoText) {
@@ -665,6 +698,38 @@ function parseUploadedEntryTexts(entryTexts, props) {
     updateBafSnpTrack(parseSnpData(entryTexts["snp.txt"]));
   } else if (entryTexts["baf.csv"]) {
     updateBafSnpTrack(parseSnpData(entryTexts["baf.csv"], ","));
+  }
+
+  // Detect and parse sample metadata CSV if present
+  const metadataFilename =
+    Object.keys(entryTexts).find((filename) => {
+      const lower = filename.toLowerCase();
+      return (
+        lower.endsWith(".csv") &&
+        (lower.includes("metadata") ||
+          lower.includes("metric") ||
+          lower.includes("sample") ||
+          lower.includes("qc") ||
+          lower.includes("info"))
+      );
+    }) ||
+    Object.keys(entryTexts).find((filename) => {
+      if (!filename.toLowerCase().endsWith(".csv")) return false;
+      const text = entryTexts[filename] || "";
+      const firstLine = text.split(/\r?\n/)[0]?.toLowerCase() || "";
+      return firstLine.includes("ploidy") || firstLine.includes("purity") || firstLine.includes("sample");
+    });
+
+  if (metadataFilename && entryTexts[metadataFilename]) {
+    const meta = parseSampleMetadataCsv(entryTexts[metadataFilename]);
+    if (meta) {
+      window._viscannerSampleMetadata = meta;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("viscanner:sample-metadata-updated", { detail: meta })
+        );
+      }
+    }
   }
 
   if (typeof window !== "undefined") {

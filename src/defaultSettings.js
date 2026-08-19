@@ -11,17 +11,17 @@ export const DEFAULT_SETTINGS = {
   // 1. WAKHAN COPY NUMBER TRACK OVERLAYS
   // =========================================================================
   // Set to true to show, or false to hide by default:
-  showHp1: false,                // Blue HP-1 copy number segments
-  showHp2: false,                // Orange HP-2 copy number segments
-  showCoveragePoints: false,     // Grey coverage depth scatter points
+  showHp1: true,                 // Blue HP-1 copy number segments
+  showHp2: true,                 // Orange HP-2 copy number segments
+  showCoveragePoints: true,      // Grey coverage depth scatter points
 
   // =========================================================================
   // 2. STRUCTURAL VARIATION (SV) PLOTS & REGION OVERLAYS
   // =========================================================================
-  showHpSvTrack: false,          // Top SV arc track (Structural Variations plot)
-  showSvLinesInCopyNumber: false, // Vertical dashed lines for SV breakpoints in copy number track
-  showLohRegions: false,         // Loss of Heterozygosity (LOH) green shaded regions
-  showMaskedRegions: false,      // Centromere masked grey bands
+  showHpSvTrack: true,           // Top SV arc track (Structural Variations plot)
+  showSvLinesInCopyNumber: true, // Vertical dashed lines for SV breakpoints in copy number track
+  showLohRegions: false,          // Loss of Heterozygosity (LOH) green shaded regions
+  showMaskedRegions: false,       // Centromere masked grey bands
 
   // Filter mode for SVs:
   // "matched" -> Only show SVs that match copy number segment boundaries
@@ -36,12 +36,12 @@ export const DEFAULT_SETTINGS = {
   // =========================================================================
   // Set each SV type to true (checked) or false (unchecked) by default:
   svTypes: {
-    DEL: false,   // Deletions
-    INV: false,   // Inversions
-    INS: false,   // Insertions
-    BND: false,   // Translocations / Breakends
-    DUP: false,   // Duplications
-    sBND: false,  // Small Breakends
+    DEL: true,    // Deletions
+    INV: true,    // Inversions
+    INS: true,    // Insertions
+    BND: true,    // Translocations / Breakends
+    DUP: true,    // Duplications
+    sBND: true,   // Small Breakends
   },
 
   // =========================================================================

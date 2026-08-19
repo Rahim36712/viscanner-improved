@@ -74,7 +74,7 @@ export class Facets extends React.PureComponent {
     try {
       hideTrackBorders();
       const svg = hgc.api.exportAsSvg();
-      await exportSvgAsPdf(svg, "viscanner-cohort.pdf");
+      await exportSvgAsPdf(svg);
     } catch (error) {
       console.error("Failed to export the visualization as a PDF:", error);
     } finally {

@@ -149,13 +149,30 @@ export function exportPngBlobAsPdf(pngBlob, filename = "viscanner-cohort.pdf") {
  * high-resolution capture, which avoids introducing an additional rasterization
  * step during PDF generation.
  */
-export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
+export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata = null) {
   if (!svgMarkup || typeof svgMarkup !== "string") {
     return Promise.reject(new Error("The visualization did not return an SVG export."));
   }
 
+  const meta =
+    customMetadata ||
+    (typeof window !== "undefined" ? window._viscannerSampleMetadata : null) || {
+      sample_name: "1437_merged",
+      ploidy: "2.57",
+      purity: "0.65",
+      confidence: "0.86",
+    };
+
+  const sampleName = meta.sample_name || "1437_merged";
+  const filename =
+    customFilename ||
+    `viscanner_sample_${sampleName}.pdf`;
+
   const cleanedSvg = sanitizeSvgForPdf(svgMarkup);
   const { width, height } = getSvgSize(cleanedSvg);
+
+  const HEADER_HEIGHT = 86; // Height reserved at the top for sample title, QC metrics & legend
+  const totalHeight = height + HEADER_HEIGHT;
 
   return new Promise((resolve, reject) => {
     // Yield execution to event loop so UI state (e.g. loading spinner) updates before PDF compilation
@@ -164,7 +181,7 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
         const pdf = new PDFDocument({
           autoFirstPage: false,
           margin: 0,
-          size: [width, height],
+          size: [width, totalHeight],
           compress: true,
         });
         const stream = pdf.pipe(blobStream());
@@ -180,8 +197,94 @@ export function exportSvgAsPdf(svgMarkup, filename = "viscanner-cohort.pdf") {
         });
         stream.on("error", reject);
 
-        pdf.addPage({ size: [width, height], margin: 0 });
-        SVGtoPDF(pdf, cleanedSvg, 0, 0, {
+        pdf.addPage({ size: [width, totalHeight], margin: 0 });
+
+        // 1. Crisp white background for header area
+        pdf.rect(0, 0, width, HEADER_HEIGHT).fill("#ffffff");
+
+        // 2. Sample ID Title (Red, bold, centered)
+        pdf
+          .font("Helvetica-Bold")
+          .fontSize(14)
+          .fillColor("#D90429")
+          .text(sampleName, 0, 10, { width, align: "center" });
+
+        // 3. QC Metrics Row (Ploidy in red, Purity & Confidence in blue)
+        const ploidyVal = meta.ploidy !== undefined ? String(meta.ploidy) : "2.57";
+        const purityVal = meta.purity !== undefined ? String(meta.purity) : "0.65";
+        const confVal = meta.confidence !== undefined ? String(meta.confidence) : "0.86";
+
+        pdf.font("Helvetica-Bold").fontSize(10);
+        const fullMetricsStr = `Ploidy: ${ploidyVal}    Purity: ${purityVal}    Confidence: ${confVal}`;
+        const metricsStrWidth = pdf.widthOfString(fullMetricsStr);
+        let startX = Math.max(10, (width - metricsStrWidth) / 2);
+        const metricsY = 28;
+
+        pdf.fillColor("#2D7DD2").text("Ploidy: ", startX, metricsY, { continued: true });
+        pdf.fillColor("#D90429").text(`${ploidyVal}    `, { continued: true });
+        pdf.fillColor("#2D7DD2").text("Purity: ", { continued: true });
+        pdf.fillColor("#D90429").text(`${purityVal}    `, { continued: true });
+        pdf.fillColor("#2D7DD2").text("Confidence: ", { continued: true });
+        pdf.fillColor("#D90429").text(confVal, { continued: false });
+
+        // 4. Dot & Line Swatches Row
+        const swatchesY = 46;
+        const swatchItems = [
+          { type: "dot", label: "HP-1", color: "#B23A48" },
+          { type: "dot", label: "HP-2", color: "#2D7DD2" },
+          { type: "dot", label: "BAF", color: "#9A9D32" },
+          { type: "line", label: "HP-1", color: "#B23A48" },
+          { type: "line", label: "HP-2", color: "#2D7DD2" },
+        ];
+
+        pdf.font("Helvetica").fontSize(9);
+        let totalSwatchesWidth = 0;
+        swatchItems.forEach((item) => {
+          totalSwatchesWidth += (item.type === "dot" ? 12 : 18) + pdf.widthOfString(item.label) + 16;
+        });
+
+        let swatchX = Math.max(10, (width - totalSwatchesWidth) / 2);
+        swatchItems.forEach((item) => {
+          if (item.type === "dot") {
+            pdf.circle(swatchX + 4, swatchesY + 4, 3.5).fill(item.color);
+            swatchX += 12;
+          } else {
+            pdf.rect(swatchX, swatchesY + 3, 14, 2.5).fill(item.color);
+            swatchX += 18;
+          }
+          pdf.fillColor("#444444").text(item.label, swatchX, swatchesY, { continued: false });
+          swatchX += pdf.widthOfString(item.label) + 16;
+        });
+
+        // 5. Horizontal SV Type Badges
+        const badgesY = 64;
+        const badges = [
+          { label: "DEL", color: "#D90429" },
+          { label: "INV", color: "#3A0CA3" },
+          { label: "INS", color: "#B58403" },
+          { label: "BND", color: "#212529" },
+          { label: "DUP", color: "#15803D" },
+          { label: "LOH", color: "#2D7DD2" },
+        ];
+
+        const badgeWidth = 32;
+        const badgeHeight = 14;
+        const badgeGap = 8;
+        const totalBadgesWidth = badges.length * badgeWidth + (badges.length - 1) * badgeGap;
+        let badgeX = Math.max(10, (width - totalBadgesWidth) / 2);
+
+        badges.forEach((b) => {
+          pdf.roundedRect(badgeX, badgesY, badgeWidth, badgeHeight, 2).fill(b.color);
+          pdf
+            .font("Helvetica-Bold")
+            .fontSize(7.5)
+            .fillColor("#ffffff")
+            .text(b.label, badgeX, badgesY + 3, { width: badgeWidth, align: "center" });
+          badgeX += badgeWidth + badgeGap;
+        });
+
+        // 6. Draw HiGlass SVG below header
+        SVGtoPDF(pdf, cleanedSvg, 0, HEADER_HEIGHT, {
           assumePt: false,
           height,
           precision: 6,

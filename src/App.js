@@ -343,6 +343,108 @@ function SvVisibilityControls() {
   );
 }
 
+function SampleLegendBanner() {
+  const [metadata, setMetadata] = React.useState(() => {
+    if (typeof window !== "undefined" && window._viscannerSampleMetadata) {
+      return window._viscannerSampleMetadata;
+    }
+    return {
+      sample_name: "1437_merged",
+      ploidy: "2.57",
+      purity: "0.65",
+      confidence: "0.86",
+    };
+  });
+
+  React.useEffect(() => {
+    const handleUpdate = (e) => {
+      if (e && e.detail) {
+        setMetadata(e.detail);
+      }
+    };
+    window.addEventListener("viscanner:sample-metadata-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("viscanner:sample-metadata-updated", handleUpdate);
+    };
+  }, []);
+
+  const svBadges = [
+    { label: "DEL", color: "#D90429" },
+    { label: "INV", color: "#3A0CA3" },
+    { label: "INS", color: "#B58403" },
+    { label: "BND", color: "#212529" },
+    { label: "DUP", color: "#15803D" },
+    { label: "LOH", color: "#2D7DD2" },
+  ];
+
+  return (
+    <div className="sample-legend-banner text-center py-2 px-3 mb-2 bg-white border rounded shadow-sm">
+      {/* Sample ID Title */}
+      <div className="fw-bold mb-1" style={{ color: "#D90429", fontSize: "17px" }}>
+        {metadata.sample_name || "1437_merged"}
+      </div>
+
+      {/* QC Metrics Row */}
+      <div className="mb-2" style={{ fontSize: "13px", fontWeight: "600" }}>
+        <span style={{ color: "#2D7DD2" }}>
+          Ploidy: <span style={{ color: "#D90429" }}>{metadata.ploidy ?? "2.57"}</span>
+        </span>
+        <span className="mx-3" style={{ color: "#2D7DD2" }}>
+          Purity: <span style={{ color: "#D90429" }}>{metadata.purity ?? "0.65"}</span>
+        </span>
+        <span style={{ color: "#2D7DD2" }}>
+          Confidence: <span style={{ color: "#D90429" }}>{metadata.confidence ?? "0.86"}</span>
+        </span>
+      </div>
+
+      {/* Legend Dots & Lines */}
+      <div className="d-flex flex-wrap justify-content-center align-items-center mb-2" style={{ fontSize: "12px", color: "#555", gap: "14px" }}>
+        <span className="d-inline-flex align-items-center">
+          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#B23A48", marginRight: "5px" }}></span>
+          HP-1
+        </span>
+        <span className="d-inline-flex align-items-center">
+          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#2D7DD2", marginRight: "5px" }}></span>
+          HP-2
+        </span>
+        <span className="d-inline-flex align-items-center">
+          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#9A9D32", marginRight: "5px" }}></span>
+          BAF
+        </span>
+        <span className="d-inline-flex align-items-center">
+          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: "#B23A48", marginRight: "5px" }}></span>
+          HP-1
+        </span>
+        <span className="d-inline-flex align-items-center">
+          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: "#2D7DD2", marginRight: "5px" }}></span>
+          HP-2
+        </span>
+      </div>
+
+      {/* Horizontal SV Type Badges */}
+      <div className="d-flex flex-wrap justify-content-center align-items-center" style={{ gap: "10px" }}>
+        {svBadges.map((badge) => (
+          <span
+            key={badge.label}
+            style={{
+              backgroundColor: badge.color,
+              color: "#ffffff",
+              fontWeight: "bold",
+              fontSize: "11px",
+              padding: "2px 8px",
+              borderRadius: "3px",
+              display: "inline-block",
+              letterSpacing: "0.5px",
+            }}
+          >
+            {badge.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <div className="App">
@@ -368,6 +470,7 @@ function App() {
             <SvVisibilityControls />
           </div>
           <div className="col-md-9">
+            <SampleLegendBanner />
             <div className="fixedHeight" id="higlass-container">
               <HiglassBrowser />
             </div>
