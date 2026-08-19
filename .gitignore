@@ -21,5 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 .vercel
 .env*
+.agents
+/playwright-report
+/test-results
