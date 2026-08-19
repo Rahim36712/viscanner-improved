@@ -9,30 +9,16 @@ const fallbackDir = "d:/internship/files/foles";
 const sourceDir = fs.existsSync(folesDir) ? folesDir : fallbackDir;
 console.log("Reading example data source files from:", sourceDir);
 
-const files = [
-  "2009_2.36_0.97_0.8_copynumbers_segments_HP_1.bed",
-  "2009_2.36_0.97_0.8_copynumbers_segments_HP_2.bed",
-  "baf.csv",
-  "phase_corrected_coverage.csv",
-  "severus_somatic.vcf",
-  "LOH_regions.bed",
-  "grch38.cen_coord.curated.bed",
-  "grch37.cen_coord.bed",
-  "chm13v2_cen_coord.bed",
-];
-
 const entryTexts = {};
-files.forEach((file) => {
-  let filePath = path.join(sourceDir, file);
-  if (!fs.existsSync(filePath) && fs.existsSync(path.join(fallbackDir, file))) {
-    filePath = path.join(fallbackDir, file);
-  }
-  if (fs.existsSync(filePath)) {
-    entryTexts[file] = fs.readFileSync(filePath, "utf8");
-    console.log(`Loaded ${file} (${(entryTexts[file].length / 1024).toFixed(1)} KB)`);
-  } else {
-    console.warn(`Warning: Could not find ${file}`);
-  }
+const availableFiles = fs.readdirSync(sourceDir).filter((file) => {
+  const filePath = path.join(sourceDir, file);
+  return fs.statSync(filePath).isFile() && !file.endsWith(".zip");
+});
+
+availableFiles.forEach((file) => {
+  const filePath = path.join(sourceDir, file);
+  entryTexts[file] = fs.readFileSync(filePath, "utf8");
+  console.log(`Loaded ${file} (${(entryTexts[file].length / 1024).toFixed(1)} KB)`);
 });
 
 // JSON stringify and gzip

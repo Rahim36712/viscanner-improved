@@ -14,6 +14,10 @@ const fs = require("fs");
 
 console.log("🚀 Starting automated deployment pipeline...");
 
+// Step 0: Ensure exampleData module is freshly generated from source files
+console.log("🔄 Generating exampleData module from source_files...");
+execSync("node scripts/generate-example-data.js", { stdio: "inherit" });
+
 // Step 1: Run production build
 console.log("📦 Building production bundle (npm run build)...");
 execSync("npm run build", { stdio: "inherit" });
@@ -26,12 +30,12 @@ execSync("node scripts/publish-gh-pages.js", { stdio: "inherit" });
 console.log("🔄 Syncing production build with root, docs/, and main branch...");
 execSync("node scripts/sync-bundles.js", { stdio: "inherit" });
 
-execSync("git add index.html bundle.js bundle.*.js bundle.*.txt favicon.ico dist docs examples scripts", { stdio: "inherit" });
+execSync("git add -A", { stdio: "inherit" });
 
 const status = execSync("git status --porcelain", { encoding: "utf8" });
-if (status.includes("dist/") || status.includes("docs/") || status.includes("index.html") || status.includes("bundle") || status.includes("scripts/")) {
-  console.log("📝 Committing updated production bundles in root, dist, and docs...");
-  execSync('git commit -m "Deploy latest production build to root, dist, and docs [auto]"', { stdio: "inherit" });
+if (status) {
+  console.log("📝 Committing updated production bundles and source files...");
+  execSync('git commit -m "Deploy latest production build with updated example dataset [auto]"', { stdio: "inherit" });
 }
 
 console.log("⬆️ Pushing working branches to GitHub...");
