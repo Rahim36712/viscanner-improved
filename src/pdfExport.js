@@ -3,6 +3,7 @@
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import SVGtoPDF from "svg-to-pdfkit";
 import blobStream from "blob-stream";
+import { SV_CONFIG, TRACK_COLORS } from "./labelsConfig";
 
 const PX_TO_PT = 72 / 96;
 const DEFAULT_WIDTH = 1200;
@@ -154,19 +155,26 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
     return Promise.reject(new Error("The visualization did not return an SVG export."));
   }
 
+  const defaultSampleName =
+    (typeof window !== "undefined" && window._viscannerLoadedSampleName) || "Sample 2009";
+
   const meta =
     customMetadata ||
     (typeof window !== "undefined" ? window._viscannerSampleMetadata : null) || {
-      sample_name: "1437_merged",
+      sample_name: defaultSampleName,
       ploidy: "2.57",
       purity: "0.65",
       confidence: "0.86",
     };
 
-  const sampleName = meta.sample_name || "1437_merged";
+  const sampleName =
+    meta.sample_name && meta.sample_name !== "1437_merged"
+      ? meta.sample_name
+      : defaultSampleName;
+
   const filename =
     customFilename ||
-    `viscanner_sample_${sampleName}.pdf`;
+    `viscanner_${sampleName.replace(/[^a-zA-Z0-9_\-]/g, "_")}.pdf`;
 
   const cleanedSvg = sanitizeSvgForPdf(svgMarkup);
   const { width, height } = getSvgSize(cleanedSvg);
@@ -209,7 +217,7 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
           .fillColor("#D90429")
           .text(sampleName, 0, 10, { width, align: "center" });
 
-        // 3. QC Metrics Row (Ploidy in red, Purity & Confidence in blue)
+        // 3. QC Metrics Row (Ploidy, Purity, Confidence)
         const ploidyVal = meta.ploidy !== undefined ? String(meta.ploidy) : "2.57";
         const purityVal = meta.purity !== undefined ? String(meta.purity) : "0.65";
         const confVal = meta.confidence !== undefined ? String(meta.confidence) : "0.86";
@@ -227,44 +235,37 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
         pdf.fillColor("#2D7DD2").text("Confidence: ", { continued: true });
         pdf.fillColor("#D90429").text(confVal, { continued: false });
 
-        // 4. Dot & Line Swatches Row
+        // 4. Dot Swatches Row (HP-1, HP-2, BAF only, no duplicate line items)
         const swatchesY = 46;
         const swatchItems = [
-          { type: "dot", label: "HP-1", color: "#B23A48" },
-          { type: "dot", label: "HP-2", color: "#2D7DD2" },
+          { type: "dot", label: "HP-1", color: TRACK_COLORS.hp1 || "#B23A48" },
+          { type: "dot", label: "HP-2", color: TRACK_COLORS.hp2 || "#2D7DD2" },
           { type: "dot", label: "BAF", color: "#9A9D32" },
-          { type: "line", label: "HP-1", color: "#B23A48" },
-          { type: "line", label: "HP-2", color: "#2D7DD2" },
         ];
 
         pdf.font("Helvetica").fontSize(9);
         let totalSwatchesWidth = 0;
         swatchItems.forEach((item) => {
-          totalSwatchesWidth += (item.type === "dot" ? 12 : 18) + pdf.widthOfString(item.label) + 16;
+          totalSwatchesWidth += 12 + pdf.widthOfString(item.label) + 16;
         });
 
         let swatchX = Math.max(10, (width - totalSwatchesWidth) / 2);
         swatchItems.forEach((item) => {
-          if (item.type === "dot") {
-            pdf.circle(swatchX + 4, swatchesY + 4, 3.5).fill(item.color);
-            swatchX += 12;
-          } else {
-            pdf.rect(swatchX, swatchesY + 3, 14, 2.5).fill(item.color);
-            swatchX += 18;
-          }
+          pdf.circle(swatchX + 4, swatchesY + 4, 3.5).fill(item.color);
+          swatchX += 12;
           pdf.fillColor("#444444").text(item.label, swatchX, swatchesY, { continued: false });
           swatchX += pdf.widthOfString(item.label) + 16;
         });
 
-        // 5. Horizontal SV Type Badges
+        // 5. Horizontal SV Type Badges synchronized with SV_CONFIG.TYPE_COLORS
         const badgesY = 64;
         const badges = [
-          { label: "DEL", color: "#D90429" },
-          { label: "INV", color: "#3A0CA3" },
-          { label: "INS", color: "#B58403" },
-          { label: "BND", color: "#212529" },
-          { label: "DUP", color: "#15803D" },
-          { label: "LOH", color: "#2D7DD2" },
+          { label: "DEL", color: SV_CONFIG.TYPE_COLORS.DEL || "#B82607" },
+          { label: "INV", color: SV_CONFIG.TYPE_COLORS.INV || "#D1970F" },
+          { label: "INS", color: SV_CONFIG.TYPE_COLORS.INS || "#0004FF" },
+          { label: "BND", color: SV_CONFIG.TYPE_COLORS.BND || "#616060" },
+          { label: "DUP", color: SV_CONFIG.TYPE_COLORS.DUP || "#399953" },
+          { label: "LOH", color: TRACK_COLORS.lohRegionBorder || "#555555" },
         ];
 
         const badgeWidth = 32;

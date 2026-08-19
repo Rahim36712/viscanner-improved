@@ -102,8 +102,11 @@ export function parseSampleMetadataCsv(text) {
   const headers = lines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
   const values = lines[1].split(delimiter).map((v) => v.trim().replace(/['"]/g, ""));
 
+  const fallbackName =
+    (typeof window !== "undefined" && window._viscannerLoadedSampleName) || "Sample 2009";
+
   const meta = {
-    sample_name: "1437_merged",
+    sample_name: fallbackName,
     ploidy: "2.57",
     purity: "0.65",
     confidence: "0.86",
@@ -644,6 +647,10 @@ function parseUploadedEntryTexts(entryTexts, props) {
     );
 
     if (hp1Filename && hp2Filename) {
+      const sampleMatch = hp1Filename.replace(/_copynumbers_segments_HP_1\.bed$/i, "");
+      if (sampleMatch && typeof window !== "undefined") {
+        window._viscannerLoadedSampleName = sampleMatch;
+      }
       const hp1Segments = parseWakhanSegmentBed(
         entryTexts[hp1Filename],
         "hp1"
