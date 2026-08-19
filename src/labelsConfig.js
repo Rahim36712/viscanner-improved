@@ -73,7 +73,7 @@ export const LABELS = {
     hp2SvPlot: "Phased HP2 SV's plot",
     svLinesInCopyNumber: "Display SV lines in copy-number plot",
     maskedRegionsInCopyNumber: "Masked Centromere regions",
-    lohRegionsInCopyNumber: "LOH regions",
+    lohRegionsInCopyNumber: "Masked LOH regions",
     typesTitle: "SV TYPES",
     minSpanTitle: "SV MIN SPAN",
     minSpanUnit: "bp",
