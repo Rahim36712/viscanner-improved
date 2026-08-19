@@ -12,20 +12,4 @@ console.log("Commit ID:", commit);
 execSync(`git update-ref refs/heads/gh-pages ${commit}`);
 console.log("Updated local gh-pages branch to", commit);
 
-console.log("Pushing to origin gh-pages...");
-try {
-  execSync("git push origin gh-pages --force", { stdio: "inherit" });
-  console.log("Successfully pushed to origin gh-pages!");
-} catch (e) {
-  console.error("Error pushing to origin gh-pages:", e.message);
-}
-
-console.log("Pushing to improved gh-pages...");
-try {
-  execSync("git push improved gh-pages --force", { stdio: "inherit" });
-  console.log("Successfully pushed to improved gh-pages!");
-} catch (e) {
-  console.error("Error pushing to improved gh-pages:", e.message);
-}
-
-console.log("Done publishing gh-pages!");
+console.log("Local gh-pages branch updated. (No automatic push to remotes performed).");

@@ -3,9 +3,6 @@
 import React, { useRef } from "react";
 import { HiGlassComponent } from "higlass/dist/hglib";
 import { default as higlassRegister } from "higlass-register/dist/higlass-register";
-// import { default as SequenceTrack } from "higlass-sequence/es/SequenceTrack";
-// import { default as TranscriptsTrack } from "higlass-transcripts/es/TranscriptsTrack";
-// import { default as ClinvarTrack } from "higlass-clinvar/es/ClinvarTrack";
 import { default as TextTrack } from "higlass-text/es/TextTrack";
 import { default as AlignedChromosomeLabelsTrack } from "./AlignedChromosomeLabelsTrack";
 import { default as ScannerResultTrack } from "./ScannerResultTrackPatched";
@@ -13,36 +10,44 @@ import { default as WakhanCoverageTrack } from "./WakhanCoverageTrack";
 import { default as WakhanStructuralVariationTrack } from "./WakhanStructuralVariationTrack";
 import { default as HorizontalGeneAnnotationsTrack } from "./HorizontalGeneAnnotationsTrackPatched";
 import { scheduleFitToContent } from "./higlassLayout";
-// import { default as OrthologsTrack } from "higlass-orthologs/es/OrthologsTrack";
-// import { default as GnomadTrack } from "higlass-gnomad/es/GnomadTrack";
-// import { default as GeneralVcfTrack } from 'higlass-general-vcf/es/GeneralVcfTrack';
-// import { default as CohortTrack } from "higlass-cohort/es/CohortTrack";
-// import { default as GeneListTrack } from 'higlass-cohort/es/GeneListTrack';
-// import { BigwigDataFetcher } from "higlass-bigwig-datafetcher";
 import HiGlassErrorBoundary from "./HiGlassErrorBoundary";
 import viewConfig from "./viewConfig.json";
+import { DEFAULT_SETTINGS } from "./defaultSettings";
+
+function getInitializedViewConfig() {
+  const cloned = JSON.parse(JSON.stringify(viewConfig.viewConfig));
+  const topTracks = (cloned.views && cloned.views[0] && cloned.views[0].tracks && cloned.views[0].tracks.top) || [];
+  topTracks.forEach((track) => {
+    if (track.type === "wakhanCoverage") {
+      track.options = track.options || {};
+      track.options.showHp1 = DEFAULT_SETTINGS.showHp1 ?? true;
+      track.options.showHp2 = DEFAULT_SETTINGS.showHp2 ?? true;
+      track.options.showCoverage = DEFAULT_SETTINGS.showCoveragePoints ?? true;
+      track.options.showSvBreakpoints = DEFAULT_SETTINGS.showSvLinesInCopyNumber ?? true;
+      track.options.showMaskedRegions = DEFAULT_SETTINGS.showMaskedRegions ?? false;
+      track.options.showLohRegions = DEFAULT_SETTINGS.showLohRegions ?? false;
+      track.options.svMode = DEFAULT_SETTINGS.svMode ?? "matched";
+      track.options.visibleTypes = { ...(DEFAULT_SETTINGS.svTypes || {}) };
+    } else if (track.type === "wakhanStructuralVariation") {
+      track.options = track.options || {};
+      track.options.showTrack = DEFAULT_SETTINGS.showHpSvTrack ?? true;
+      track.options.svMode = DEFAULT_SETTINGS.svMode ?? "matched";
+      track.options.visibleTypes = { ...(DEFAULT_SETTINGS.svTypes || {}) };
+      if (!track.options.showTrack && track.uid === "wakhan-hp-sv-track") {
+        track.height = 1;
+      }
+    }
+  });
+  return cloned;
+}
 
 export class HiglassBrowser extends React.PureComponent {
   constructor(props) {
     super(props);
     this.hgc = React.createRef();
     window.hgc = this.hgc;
-    this.viewConfig = viewConfig.viewConfig;
-    // higlassRegister({
-    //   name: "SequenceTrack",
-    //   track: SequenceTrack,
-    //   config: SequenceTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "TranscriptsTrack",
-    //   track: TranscriptsTrack,
-    //   config: TranscriptsTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "ClinvarTrack",
-    //   track: ClinvarTrack,
-    //   config: ClinvarTrack.config,
-    // });
+    this.viewConfig = getInitializedViewConfig();
+
     higlassRegister({
       name: "TextTrack",
       track: TextTrack,
@@ -73,38 +78,6 @@ export class HiglassBrowser extends React.PureComponent {
       track: HorizontalGeneAnnotationsTrack,
       config: HorizontalGeneAnnotationsTrack.config,
     }, { force: true });
-    // higlassRegister({
-    //   name: "OrthologsTrack",
-    //   track: OrthologsTrack,
-    //   config: OrthologsTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "GnomadTrack",
-    //   track: GnomadTrack,
-    //   config: GnomadTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "GeneralVcfTrack",
-    //   track: GeneralVcfTrack,
-    //   config: GeneralVcfTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "CohortTrack",
-    //   track: CohortTrack,
-    //   config: CohortTrack.config,
-    // });
-    // higlassRegister({
-    //   name: "GeneListTrack",
-    //   track: GeneListTrack,
-    //   config: GeneListTrack.config,
-    // });
-    // higlassRegister(
-    //   {
-    //     dataFetcher: BigwigDataFetcher,
-    //     config: BigwigDataFetcher.config,
-    //   },
-    //   { pluginType: "dataFetcher" }
-    // );
   }
 
   componentDidMount() {

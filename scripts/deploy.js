@@ -38,19 +38,4 @@ if (status) {
   execSync('git commit -m "Deploy latest production build with updated example dataset [auto]"', { stdio: "inherit" });
 }
 
-console.log("⬆️ Pushing working branches to GitHub...");
-try {
-  execSync("git push origin main", { stdio: "inherit" });
-  execSync("git push origin main:wakhan-hp-tracks --force", { stdio: "inherit" });
-} catch (e) {
-  console.log("Notice during origin push:", e.message);
-}
-
-try {
-  execSync("git push improved main --force", { stdio: "inherit" });
-  execSync("git push improved main:wakhan-hp-tracks --force", { stdio: "inherit" });
-} catch (e) {
-  console.log("Notice during improved push:", e.message);
-}
-
-console.log("🎉 Deployment complete! All branches and GitHub Pages are 100% updated.");
+console.log("🎉 Build and bundle sync complete! (No git push performed - push manually when ready)");

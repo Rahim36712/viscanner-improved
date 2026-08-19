@@ -127,18 +127,18 @@
                 "maxSvBreakpointMarkers": 1600,
                 "minVariantLength": 50,
                 "maxVariantLength": null,
-                "showHp1": false,
-                "showHp2": false,
-                "showCoverage": false,
-                "showSvBreakpoints": false,
+                "showHp1": true,
+                "showHp2": true,
+                "showCoverage": true,
+                "showSvBreakpoints": true,
                 "svMode": "matched",
                 "visibleTypes": {
-                  "DEL": false,
-                  "INV": false,
-                  "INS": false,
-                  "BND": false,
-                  "DUP": false,
-                  "sBND": false
+                  "DEL": true,
+                  "INV": true,
+                  "INS": true,
+                  "BND": true,
+                  "DUP": true,
+                  "sBND": true
                 },
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "data": {},
@@ -160,18 +160,18 @@
                 "passOnly": true,
                 "hpLaneMode": false,
                 "hpFilter": "2",
-                "showTrack": false,
+                "showTrack": true,
                 "layoutAfterUid": "wakhan-coverage-track",
                 "collapsedHeight": 1,
                 "expandedHeight": 90,
                 "svMode": "matched",
                 "visibleTypes": {
-                  "DEL": false,
-                  "INV": false,
-                  "INS": false,
-                  "BND": false,
-                  "DUP": false,
-                  "sBND": false
+                  "DEL": true,
+                  "INV": true,
+                  "INS": true,
+                  "BND": true,
+                  "DUP": true,
+                  "sBND": true
                 },
                 "chromSizesUrl": "https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv",
                 "data": {
@@ -181,7 +181,7 @@
                 "expandedHeight": 90,
                 "arcHeightMultiplier": 5.0
               },
-              "height": 1,
+              "height": 90,
               "uid": "wakhan-hp-sv-track",
               "width": 450
             }
