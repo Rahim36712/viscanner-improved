@@ -14,6 +14,22 @@ if (!match) {
 const mainBundleName = match[1];
 console.log("Main bundle name:", mainBundleName);
 
+const distFiles = new Set(fs.readdirSync(dist));
+
+// Clean up stale bundle files in root and docs that are no longer in dist
+[root, docs].forEach((targetDir) => {
+  if (fs.existsSync(targetDir)) {
+    fs.readdirSync(targetDir).forEach((file) => {
+      if (file.startsWith("bundle.") && file !== "bundle.js" && !distFiles.has(file)) {
+        try {
+          fs.unlinkSync(path.join(targetDir, file));
+          console.log(`Removed stale bundle: ${path.relative(root, path.join(targetDir, file))}`);
+        } catch (e) {}
+      }
+    });
+  }
+});
+
 const mainBundlePath = path.join(dist, mainBundleName);
 
 // Copy main bundle to bundle.js in root, dist, and docs

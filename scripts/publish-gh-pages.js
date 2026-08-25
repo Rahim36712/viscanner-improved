@@ -1,5 +1,7 @@
 const { execSync } = require("child_process");
 
+console.log("Staging dist/ folder for gh-pages tree...");
+execSync("git add dist", { stdio: "inherit" });
 console.log("Creating tree from dist/ folder...");
 const tree = execSync("git write-tree --prefix=dist", { encoding: "utf8" }).trim();
 console.log("Tree ID:", tree);
