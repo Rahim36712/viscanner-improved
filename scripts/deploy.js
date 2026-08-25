@@ -22,23 +22,19 @@ execSync("node scripts/generate-example-data.js", { stdio: "inherit" });
 console.log("📦 Building production bundle (npm run build)...");
 execSync("npm run build", { stdio: "inherit" });
 
-// Step 2: Copy dist files to docs/ and root, and clean stale bundles
-console.log("🔄 Syncing production build with root, docs/, and main branch...");
-execSync("node scripts/sync-bundles.js", { stdio: "inherit" });
-
-// Step 3: Stage all changes
-console.log("📦 Staging updated files...");
-execSync("git add -A", { stdio: "inherit" });
-
-// Step 4: Publish dist/ to gh-pages branch via direct git tree object
-console.log("🌐 Updating local gh-pages branch...");
+// Step 2: Publish dist/ to gh-pages branch on all remotes
+console.log("🌐 Publishing dist/ to gh-pages branch...");
 execSync("node scripts/publish-gh-pages.js", { stdio: "inherit" });
 
-// Step 5: Commit changes to main if any
+// Step 3: Stage all source changes on main
+console.log("📦 Staging source changes on main...");
+execSync("git add -A", { stdio: "inherit" });
+
+// Step 4: Commit changes to main if any
 const status = execSync("git status --porcelain", { encoding: "utf8" });
 if (status) {
-  console.log("📝 Committing updated production bundles and source files...");
-  execSync('git commit -m "Deploy latest production build with updated example dataset [auto]"', { stdio: "inherit" });
+  console.log("📝 Committing updated source files...");
+  execSync('git commit -m "Update source files and build configuration [auto]"', { stdio: "inherit" });
 }
 
 // Step 6: Push main and gh-pages to all remotes

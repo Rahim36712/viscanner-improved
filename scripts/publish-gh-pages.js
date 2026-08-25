@@ -1,17 +1,37 @@
+const ghpages = require("gh-pages");
+const path = require("path");
 const { execSync } = require("child_process");
 
-console.log("Staging dist/ folder for gh-pages tree...");
-execSync("git add dist", { stdio: "inherit" });
-console.log("Creating tree from dist/ folder...");
-const tree = execSync("git write-tree --prefix=dist", { encoding: "utf8" }).trim();
-console.log("Tree ID:", tree);
+const dist = path.join(__dirname, "../dist");
 
-const commit = execSync(`git commit-tree ${tree} -m "Deploy latest production build to gh-pages [auto]"`, {
-  encoding: "utf8",
-}).trim();
-console.log("Commit ID:", commit);
+function publishToRemote(remote) {
+  return new Promise((resolve) => {
+    console.log(`🌐 Publishing dist/ to ${remote}/gh-pages...`);
+    ghpages.publish(
+      dist,
+      {
+        branch: "gh-pages",
+        remote: remote,
+        dotfiles: true,
+        message: "Deploy latest production build to gh-pages [auto]",
+      },
+      (err) => {
+        if (err) {
+          console.warn(`⚠️ Warning: ghpages publish to ${remote} failed:`, err.message);
+        } else {
+          console.log(`✅ Successfully published dist/ to ${remote}/gh-pages!`);
+        }
+        resolve();
+      }
+    );
+  });
+}
 
-execSync(`git update-ref refs/heads/gh-pages ${commit}`);
-console.log("Updated local gh-pages branch to", commit);
+async function main() {
+  const remotes = execSync("git remote", { encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
+  for (const remote of remotes) {
+    await publishToRemote(remote);
+  }
+}
 
-console.log("Local gh-pages branch updated. (No automatic push to remotes performed).");
+main();
