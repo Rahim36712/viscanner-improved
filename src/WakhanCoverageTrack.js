@@ -1010,13 +1010,19 @@ function WakhanCoverageTrack(HGC, ...args) {
 
           const hp = marker.variant.hp;
           let lineTop, lineBottom;
-          if (hp === "1") {
-            lineTop = top;
-            lineBottom = centerY;
-          } else if (hp === "2") {
-            lineTop = centerY;
-            lineBottom = top + height;
+          if (DEFAULT_SETTINGS.enableHp2SvTrack === true) {
+            if (hp === "1") {
+              lineTop = top;
+              lineBottom = centerY;
+            } else if (hp === "2") {
+              lineTop = centerY;
+              lineBottom = top + height;
+            } else {
+              lineTop = top;
+              lineBottom = top + height;
+            }
           } else {
+            // Unified single-track mode: full-height vertical breakpoint lines across the track
             lineTop = top;
             lineBottom = top + height;
           }

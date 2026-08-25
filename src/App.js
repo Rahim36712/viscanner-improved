@@ -25,6 +25,8 @@ const DEFAULT_SV_VISIBILITY = SV_TYPE_OPTIONS.reduce((visibility, option) => {
   return visibility;
 }, {});
 const DEFAULT_SV_MODE = DEFAULT_SETTINGS.svMode ?? "matched";
+const ENABLE_HP2_SV_TRACK = DEFAULT_SETTINGS.enableHp2SvTrack === true;
+const DEFAULT_SHOW_SV_TRACK = DEFAULT_SETTINGS.showSvTrack ?? true;
 const DEFAULT_SHOW_HP_SV_TRACK = DEFAULT_SETTINGS.showHpSvTrack ?? false;
 const DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER = DEFAULT_SETTINGS.showSvLinesInCopyNumber ?? false;
 const DEFAULT_SHOW_MASKED_REGIONS = DEFAULT_SETTINGS.showMaskedRegions ?? false;
@@ -82,6 +84,53 @@ function updateCoverageSvVisibility(options) {
   } catch (error) {
     return;
   }
+}
+
+export function updateSingleSvTrackVisibility(showTrack) {
+  const hgc = window.hgc && window.hgc.current;
+  if (!hgc || !hgc.api || typeof hgc.api.getViewConfig !== "function") {
+    return;
+  }
+
+  try {
+    const viewconf = hgc.api.getViewConfig();
+    if (!viewconf || !viewconf.views || !viewconf.views.length) {
+      return;
+    }
+    const targetHeight = showTrack ? 90 : 1;
+    fitToContent({
+      resetLocation: showTrack,
+      preserveLocation: !showTrack,
+      trackOptionsByUid: {
+        "wakhan-sv-track": {
+          showTrack,
+          height: targetHeight,
+          expandedHeight: 90,
+          layoutHeight: 90,
+        },
+      },
+    })
+      .then(() => {
+        const svTrack = hgc.api.getTrackObject("aa", "wakhan-sv-track");
+        if (svTrack && svTrack.setVisibilityOptions) {
+          svTrack.setVisibilityOptions({
+            showTrack,
+            height: targetHeight,
+            expandedHeight: 90,
+          });
+        }
+        scheduleFitToContent();
+      })
+      .catch((err) => {
+        console.warn("fitToContent caught error silently:", err);
+      });
+  } catch (error) {
+    console.warn("Error in updateSingleSvTrackVisibility:", error);
+    return;
+  }
+}
+if (typeof window !== "undefined") {
+  window.updateSingleSvTrackVisibility = updateSingleSvTrackVisibility;
 }
 
 export function updateHpSvTrackVisibility(showTrack) {
@@ -185,6 +234,7 @@ function WakhanVisibilityControls() {
 function SvVisibilityControls() {
   const [visibility, setVisibility] = React.useState(DEFAULT_SV_VISIBILITY);
   const [svMode, setSvMode] = React.useState(DEFAULT_SV_MODE);
+  const [showSvTrack, setShowSvTrack] = React.useState(DEFAULT_SHOW_SV_TRACK);
   const [showHpSvTrack, setShowHpSvTrack] = React.useState(DEFAULT_SHOW_HP_SV_TRACK);
   const [showSvLinesInCopyNumber, setShowSvLinesInCopyNumber] = React.useState(
     DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER
@@ -201,6 +251,7 @@ function SvVisibilityControls() {
     const handleReset = () => {
       setVisibility({ ...DEFAULT_SV_VISIBILITY });
       setSvMode(DEFAULT_SV_MODE);
+      setShowSvTrack(DEFAULT_SHOW_SV_TRACK);
       setShowHpSvTrack(DEFAULT_SHOW_HP_SV_TRACK);
       setShowSvLinesInCopyNumber(DEFAULT_SHOW_SV_LINES_IN_COPY_NUMBER);
       setShowMaskedRegions(DEFAULT_SHOW_MASKED_REGIONS);
@@ -237,8 +288,12 @@ function SvVisibilityControls() {
   }, [visibility, svMode, showSvLinesInCopyNumber, showMaskedRegions, showLohRegions, maxSvSpan]);
 
   React.useEffect(() => {
-    updateHpSvTrackVisibility(showHpSvTrack);
-  }, [showHpSvTrack]);
+    if (ENABLE_HP2_SV_TRACK) {
+      updateHpSvTrackVisibility(showHpSvTrack);
+    } else {
+      updateSingleSvTrackVisibility(showSvTrack);
+    }
+  }, [showSvTrack, showHpSvTrack]);
 
   const toggleVisibility = (key) => {
     setVisibility((current) => ({
@@ -273,14 +328,25 @@ function SvVisibilityControls() {
       </div>
       <div className="sv-control-section">
         <div className="sv-control-section-title">{LABELS.svVisibility.displaysTitle}</div>
-        <label className="wakhan-visibility-option">
-          <input
-            type="checkbox"
-            checked={showHpSvTrack}
-            onChange={() => setShowHpSvTrack((current) => !current)}
-          />
-          <span>{LABELS.svVisibility.hp2SvPlot}</span>
-        </label>
+        {ENABLE_HP2_SV_TRACK ? (
+          <label className="wakhan-visibility-option">
+            <input
+              type="checkbox"
+              checked={showHpSvTrack}
+              onChange={() => setShowHpSvTrack((current) => !current)}
+            />
+            <span>{LABELS.svVisibility.hp2SvPlot}</span>
+          </label>
+        ) : (
+          <label className="wakhan-visibility-option">
+            <input
+              type="checkbox"
+              checked={showSvTrack}
+              onChange={() => setShowSvTrack((current) => !current)}
+            />
+            <span>{LABELS.svVisibility.svTrackPlot || "Breakpoints plot"}</span>
+          </label>
+        )}
         <label className="wakhan-visibility-option">
           <input
             type="checkbox"

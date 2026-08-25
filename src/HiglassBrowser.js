@@ -16,7 +16,16 @@ import { DEFAULT_SETTINGS } from "./defaultSettings";
 
 function getInitializedViewConfig() {
   const cloned = JSON.parse(JSON.stringify(viewConfig.viewConfig));
-  const topTracks = (cloned.views && cloned.views[0] && cloned.views[0].tracks && cloned.views[0].tracks.top) || [];
+  const enableHp2 = DEFAULT_SETTINGS.enableHp2SvTrack === true;
+  let topTracks = (cloned.views && cloned.views[0] && cloned.views[0].tracks && cloned.views[0].tracks.top) || [];
+
+  if (!enableHp2) {
+    topTracks = topTracks.filter((track) => track.uid !== "wakhan-hp-sv-track");
+    if (cloned.views && cloned.views[0] && cloned.views[0].tracks) {
+      cloned.views[0].tracks.top = topTracks;
+    }
+  }
+
   topTracks.forEach((track) => {
     if (track.type === "wakhanCoverage") {
       track.options = track.options || {};
@@ -30,11 +39,22 @@ function getInitializedViewConfig() {
       track.options.visibleTypes = { ...(DEFAULT_SETTINGS.svTypes || {}) };
     } else if (track.type === "wakhanStructuralVariation") {
       track.options = track.options || {};
-      track.options.showTrack = DEFAULT_SETTINGS.showHpSvTrack ?? true;
       track.options.svMode = DEFAULT_SETTINGS.svMode ?? "matched";
       track.options.visibleTypes = { ...(DEFAULT_SETTINGS.svTypes || {}) };
-      if (!track.options.showTrack && track.uid === "wakhan-hp-sv-track") {
-        track.height = 1;
+
+      if (track.uid === "wakhan-sv-track") {
+        if (!enableHp2) {
+          track.options.hpFilter = null; // Display all SVs in unified track
+        }
+        track.options.showTrack = DEFAULT_SETTINGS.showSvTrack ?? true;
+        if (!track.options.showTrack) {
+          track.height = 1;
+        }
+      } else if (track.uid === "wakhan-hp-sv-track") {
+        track.options.showTrack = DEFAULT_SETTINGS.showHpSvTrack ?? true;
+        if (!track.options.showTrack) {
+          track.height = 1;
+        }
       }
     }
   });

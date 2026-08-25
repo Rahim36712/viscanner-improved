@@ -70,6 +70,7 @@ export const LABELS = {
     bedMatchedSvs: "Wakhan Copy number BED",
     allVcfSvs: "All VCF SVs",
     displaysTitle: "SV DISPLAYS",
+    svTrackPlot: "Breakpoints plot",
     hp2SvPlot: "Phased HP2 SV's plot",
     svLinesInCopyNumber: "Display SV lines in copy-number plot",
     maskedRegionsInCopyNumber: "Mask Centromere regions",

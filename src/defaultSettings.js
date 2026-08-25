@@ -18,7 +18,13 @@ export const DEFAULT_SETTINGS = {
   // =========================================================================
   // 2. STRUCTURAL VARIATION (SV) PLOTS & REGION OVERLAYS
   // =========================================================================
-  showHpSvTrack: true,           // Top SV arc track (Structural Variations plot)
+  // Feature flag: set to false to disable the bottom HP-2 SV track and show
+  // a single unified "Breakpoints" plot at the top.
+  // Set to true to restore the legacy dual HP-1 (top) and HP-2 (bottom) tracks.
+  enableHp2SvTrack: false,
+
+  showSvTrack: true,             // Top Breakpoints / Structural Variations plot
+  showHpSvTrack: true,           // Legacy bottom HP-2 SV track (used when enableHp2SvTrack is true)
   showSvLinesInCopyNumber: true, // Vertical dashed lines for SV breakpoints in copy number track
   showLohRegions: false,          // Loss of Heterozygosity (LOH) green shaded regions
   showMaskedRegions: false,       // Centromere masked grey bands

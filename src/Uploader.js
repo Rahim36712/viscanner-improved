@@ -4,6 +4,7 @@ import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
 import { scheduleFitToContent } from "./higlassLayout";
 import { registerDatasetExtents } from "./plotBounds";
 import { LABELS, UI_COLORS } from "./labelsConfig";
+import { DEFAULT_SETTINGS } from "./defaultSettings";
 
 async function decompressBlob(blob) {
   let ds = new DecompressionStream("gzip");
@@ -501,7 +502,11 @@ function updateWakhanStructuralVariationTrack(data) {
 
   hgc.api.setViewConfig(viewconfCohort);
 
-  if (variants.length > 0 && typeof window.updateHpSvTrackVisibility === "function") {
+  if (
+    DEFAULT_SETTINGS.enableHp2SvTrack === true &&
+    variants.length > 0 &&
+    typeof window.updateHpSvTrackVisibility === "function"
+  ) {
     window.updateHpSvTrackVisibility(!isOnlyUnphased);
   }
 }

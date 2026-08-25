@@ -86,7 +86,7 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.currentVariants = [];
       this.hitRegions = [];
       this.svMode = this.options.svMode || DEFAULT_SV_MODE;
-      this.showTrack = this.options.showTrack !== undefined ? Boolean(this.options.showTrack) : (DEFAULT_SETTINGS.showHpSvTrack ?? false);
+      this.showTrack = this.options.showTrack !== undefined ? Boolean(this.options.showTrack) : (DEFAULT_SETTINGS.showSvTrack ?? true);
       this.hpLaneMode = this.options.hpLaneMode === true;
       this.hpFilter = normalizeHpFilter(this.options.hpFilter);
       this.visibleTypes = {
