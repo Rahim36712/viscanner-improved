@@ -11,6 +11,7 @@ import {
   parseWakhanSegmentBed,
   parseWakhanSegmentTableData,
   parseWakhanCopyNumberData,
+  parseWakhanIntegerProfileBed,
   RAR_SIGNATURE,
 } from "./Uploader";
 
@@ -263,6 +264,78 @@ describe("Uploader Data Parsers and Utilities", () => {
       const copyNumData = parseWakhanCopyNumberData(hp1Text, hp2Text);
       expect(copyNumData).toHaveLength(1);
       expect(copyNumData[0]).toEqual(["chr1", 100, 500, 2.0, 1.0, 3.0, 22.0, NaN, "Wakhan"]);
+    });
+  });
+
+  describe("parseWakhanIntegerProfileBed", () => {
+    const sampleBed = [
+      "#chr: chromosome number",
+      "#chr\tstart\tend\thp1_coverage\thp1_copynumber_state\thp1_confidence\thp2_coverage\thp2_copynumber_state\thp2_confidence\tsvs_breakpoints_ids",
+      "chr1\t0\t1365956\t66.14\t1.0\t0.2287598\t9.0\t0.0\t0.4811884\tseverus_DUP13",
+      "1\t1365957\t1386845\t66.14\t1.0\t0.2287598\t1.04\t0.0\t0.9680931\tseverus_DEL153;severus_DUP13",
+      "chr2\t500\t1000\t50.0\t2.0\t0.99\t45.0\t2.0\t0.98\t-",
+    ].join("\n");
+
+    test("parses integer_profile BED into hp1Segments, hp2Segments, tableRows, and wakhanData", () => {
+      const result = parseWakhanIntegerProfileBed(sampleBed);
+      expect(result.hp1Segments).toHaveLength(3);
+      expect(result.hp2Segments).toHaveLength(3);
+      expect(result.tableRows).toHaveLength(3);
+      expect(result.wakhanData).toHaveLength(3);
+
+      // Verify HP1 and HP2 separation
+      expect(result.hp1Segments[0].chr).toBe("chr1");
+      expect(result.hp1Segments[0].coverage).toBe(66.14);
+      expect(result.hp1Segments[0].hp1).toBe(1.0);
+      expect(result.hp1Segments[0].confidence).toBe(0.2287598);
+      expect(result.hp1Segments[0].breakpointIds).toEqual(["severus_DUP13"]);
+
+      expect(result.hp2Segments[0].chr).toBe("chr1");
+      expect(result.hp2Segments[0].coverage).toBe(9.0);
+      expect(result.hp2Segments[0].hp2).toBe(0.0);
+      expect(result.hp2Segments[0].confidence).toBe(0.4811884);
+
+      // Verify chromosome normalization
+      expect(result.hp1Segments[1].chr).toBe("chr1");
+
+      // Verify tableRows structure
+      expect(result.tableRows[0]).toEqual({
+        chr: "chr1",
+        start: 0,
+        end: 1365956,
+        hp1Coverage: 66.14,
+        hp1CopyNumber: 1.0,
+        hp1Confidence: 0.2287598,
+        hp2Coverage: 9.0,
+        hp2CopyNumber: 0.0,
+        hp2Confidence: 0.4811884,
+        breakpoints: "severus_DUP13",
+      });
+
+      // Verify wakhanData copy number summation
+      expect(result.wakhanData[0]).toEqual([
+        "chr1",
+        0,
+        1365956,
+        1.0,
+        0.0,
+        1.0,
+        75.14,
+        NaN,
+        "Wakhan",
+      ]);
+
+      // Verify matchedSvIds extracted
+      expect(result.matchedSvIds).toEqual(
+        expect.arrayContaining(["severus_DUP13", "severus_DEL153"])
+      );
+    });
+
+    test("skips malformed rows or comment rows", () => {
+      const malformed = "#header\n\nchr1\tinvalid\t200\nchr1\t100\t200\t1\t2";
+      const result = parseWakhanIntegerProfileBed(malformed);
+      expect(result.hp1Segments).toEqual([]);
+      expect(result.tableRows).toEqual([]);
     });
   });
 

@@ -424,6 +424,109 @@ export function parseWakhanCopyNumberData(hp1Text, hp2Text) {
     ]);
 }
 
+export function parseWakhanIntegerProfileBed(text) {
+  const hp1Segments = [];
+  const hp2Segments = [];
+  const tableRows = [];
+  const wakhanData = [];
+  const matchedSvIdSet = new Set();
+
+  (text || "")
+    .trim()
+    .split(/\r?\n/)
+    .forEach((r) => {
+      if (!r || r.startsWith("#")) {
+        return;
+      }
+      const segment = r.split("\t");
+      if (segment.length < 9) {
+        return;
+      }
+      const chr = normalizeChromosome(segment[0]);
+      const start = parseInt(segment[1], 10);
+      const end = parseInt(segment[2], 10);
+      if (!segment[0] || !Number.isFinite(start) || !Number.isFinite(end)) {
+        return;
+      }
+
+      const hp1Coverage = parseFloat(segment[3]);
+      const hp1CopyNumber = parseFloat(segment[4]);
+      const hp1Confidence = parseFloat(segment[5]);
+      const hp2Coverage = parseFloat(segment[6]);
+      const hp2CopyNumber = parseFloat(segment[7]);
+      const hp2Confidence = parseFloat(segment[8]);
+      const breakpoints = segment.slice(9).join("\t") || "-";
+      const breakpointIds = parseBreakpointIds(breakpoints);
+
+      breakpointIds.forEach((id) => matchedSvIdSet.add(id));
+
+      hp1Segments.push({
+        chr,
+        start,
+        end,
+        coverage: hp1Coverage,
+        hp1: hp1CopyNumber,
+        confidence: hp1Confidence,
+        breakpoints,
+        breakpointIds,
+      });
+
+      hp2Segments.push({
+        chr,
+        start,
+        end,
+        coverage: hp2Coverage,
+        hp2: hp2CopyNumber,
+        confidence: hp2Confidence,
+        breakpoints,
+        breakpointIds,
+      });
+
+      tableRows.push({
+        chr,
+        start,
+        end,
+        hp1Coverage,
+        hp1CopyNumber,
+        hp1Confidence,
+        hp2Coverage,
+        hp2CopyNumber,
+        hp2Confidence,
+        breakpoints,
+      });
+
+      wakhanData.push([
+        chr,
+        start,
+        end,
+        hp1CopyNumber,
+        hp2CopyNumber,
+        hp1CopyNumber + hp2CopyNumber,
+        hp1Coverage + hp2Coverage,
+        Number.NaN,
+        "Wakhan",
+      ]);
+    });
+
+  const sortFn = (a, b) =>
+    a.chr.localeCompare(b.chr, undefined, { numeric: true }) || a.start - b.start;
+
+  hp1Segments.sort(sortFn);
+  hp2Segments.sort(sortFn);
+  tableRows.sort(sortFn);
+  wakhanData.sort(
+    (a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }) || a[1] - b[1]
+  );
+
+  return {
+    hp1Segments,
+    hp2Segments,
+    tableRows,
+    wakhanData,
+    matchedSvIds: Array.from(matchedSvIdSet),
+  };
+}
+
 function getTrackObject(hgc, trackUid) {
   try {
     return hgc.api.getTrackObject("aa", trackUid);
@@ -644,34 +747,30 @@ function parseUploadedEntryTexts(entryTexts, props) {
   if (entryTexts["cna_long.txt"]) {
     updateCopyNumberTracks(parseHiglassData(entryTexts["cna_long.txt"]));
   } else {
-    const hp1Filename = Object.keys(entryTexts).find((filename) =>
-      filename.endsWith("copynumbers_segments_HP_1.bed")
-    );
-    const hp2Filename = Object.keys(entryTexts).find((filename) =>
-      filename.endsWith("copynumbers_segments_HP_2.bed")
-    );
+    const integerProfileFilename = Object.keys(entryTexts).find((filename) => {
+      const lower = filename.toLowerCase();
+      return lower.endsWith(".bed") && lower.includes("integer_profile");
+    });
 
-    if (hp1Filename && hp2Filename) {
-      const sampleMatch = hp1Filename.replace(/_copynumbers_segments_HP_1\.bed$/i, "");
+    if (integerProfileFilename && entryTexts[integerProfileFilename]) {
+      const sampleMatch = integerProfileFilename
+        .replace(/_integer_profile\.bed$/i, "")
+        .replace(/integer_profile\.bed$/i, "")
+        .replace(/\.bed$/i, "");
       if (sampleMatch && typeof window !== "undefined") {
         window._viscannerLoadedSampleName = sampleMatch;
       }
-      const hp1Segments = parseWakhanSegmentBed(
-        entryTexts[hp1Filename],
-        "hp1"
-      );
-      const hp2Segments = parseWakhanSegmentBed(
-        entryTexts[hp2Filename],
-        "hp2"
-      );
-      matchedSvIds = parseWakhanMatchedSvIds(hp1Segments, hp2Segments);
-      const wakhanData = parseWakhanCopyNumberData(
-        entryTexts[hp1Filename],
-        entryTexts[hp2Filename]
-      );
+      const {
+        hp1Segments,
+        hp2Segments,
+        tableRows,
+        wakhanData,
+        matchedSvIds: parsedMatchedSvIds,
+      } = parseWakhanIntegerProfileBed(entryTexts[integerProfileFilename]);
+      matchedSvIds = parsedMatchedSvIds;
       props.populateTable({
         type: "wakhan",
-        rows: parseWakhanSegmentTableData(hp1Segments, hp2Segments),
+        rows: tableRows,
         maskedRegionsByBuild,
         availableCentromereBuilds,
       });

@@ -50,8 +50,7 @@ You can upload individual raw files or a single `.zip` archive containing any of
 | File Name / Pattern | Format | Description |
 | :--- | :--- | :--- |
 | `phase_corrected_coverage.csv` | CSV | Dense phased coverage depth points (`chr`, `start`, `end`, `hp1`, `hp2`, `unphased`) |
-| `*_copynumbers_segments_HP_1.bed` | BED | Haplotype 1 copy-number segments and confidence scores |
-| `*_copynumbers_segments_HP_2.bed` | BED | Haplotype 2 copy-number segments and confidence scores |
+| `*integer_profile*.bed` / `integer_profile.bed` | BED | Phased copy-number integer profile containing HP1 & HP2 segments, coverages, states, confidences, and breakpoint IDs |
 | `baf.csv` | CSV | Phased B-Allele Frequency values (`chr`, `start`, `end`, `baf`) |
 | `severus_somatic.vcf` | VCF | Somatic structural variants (`PASS` filtered) |
 | `*_LOH*.bed` / `loh_regions.bed` | BED | Loss of Heterozygosity (LOH) region coordinates |
