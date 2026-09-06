@@ -12,6 +12,8 @@ import {
   parseWakhanSegmentTableData,
   parseWakhanCopyNumberData,
   parseWakhanIntegerProfileBed,
+  parseArchiveFilenameMetadata,
+  parseSolutionsRanksTsv,
   RAR_SIGNATURE,
 } from "./Uploader";
 
@@ -336,6 +338,72 @@ describe("Uploader Data Parsers and Utilities", () => {
       const result = parseWakhanIntegerProfileBed(malformed);
       expect(result.hp1Segments).toEqual([]);
       expect(result.tableRows).toEqual([]);
+    });
+  });
+
+  describe("parseArchiveFilenameMetadata", () => {
+    test("extracts sample name before first underscore and solution rank", () => {
+      const result = parseArchiveFilenameMetadata("H2009_Solution_1_HiScanner_plots_data.zip");
+      expect(result.sampleName).toBe("H2009");
+      expect(result.solutionRank).toBe("1");
+    });
+
+    test("handles lower-case solution naming and different solution numbers", () => {
+      const result = parseArchiveFilenameMetadata("TumorSample_solution_3_results.zip");
+      expect(result.sampleName).toBe("TumorSample");
+      expect(result.solutionRank).toBe("3");
+    });
+
+    test("returns null solutionRank if not present in filename", () => {
+      const result = parseArchiveFilenameMetadata("Sample42_unphased_data.zip");
+      expect(result.sampleName).toBe("Sample42");
+      expect(result.solutionRank).toBeNull();
+    });
+
+    test("handles invalid or non-string inputs safely", () => {
+      expect(parseArchiveFilenameMetadata(null)).toEqual({ sampleName: null, solutionRank: null });
+      expect(parseArchiveFilenameMetadata("")).toEqual({ sampleName: null, solutionRank: null });
+    });
+  });
+
+  describe("parseSolutionsRanksTsv", () => {
+    const tsvContent = [
+      "repository_name\tdna_purity\tcell_purity\tploidy\tconfidence\tsolution_rank",
+      "solution_2.3_1.0_0.71\t1.0\t0.95\t2.3\t0.71\t1",
+      "solution_3.0_0.8_0.60\t0.8\t0.80\t3.0\t0.60\t2",
+    ].join("\n");
+
+    test("parses target solution rank row matching rank 1", () => {
+      const result = parseSolutionsRanksTsv(tsvContent, "1");
+      expect(result).toBeDefined();
+      expect(result.ploidy).toBe("2.3");
+      expect(result.purity).toBe("0.95"); // Prefers cell_purity
+      expect(result.confidence).toBe("0.71");
+      expect(result.solution_rank).toBe("1");
+    });
+
+    test("parses target solution rank row matching rank 2", () => {
+      const result = parseSolutionsRanksTsv(tsvContent, "2");
+      expect(result).toBeDefined();
+      expect(result.ploidy).toBe("3.0");
+      expect(result.purity).toBe("0.80");
+      expect(result.confidence).toBe("0.60");
+      expect(result.solution_rank).toBe("2");
+    });
+
+    test("falls back to dna_purity if cell_purity is missing or empty", () => {
+      const tsvWithoutCellPurity = [
+        "repository_name\tdna_purity\tploidy\tconfidence\tsolution_rank",
+        "solution_2.3_1.0_0.71\t0.85\t2.3\t0.71\t1",
+      ].join("\n");
+      const result = parseSolutionsRanksTsv(tsvWithoutCellPurity, "1");
+      expect(result.purity).toBe("0.85");
+    });
+
+    test("returns null for malformed or empty text", () => {
+      expect(parseSolutionsRanksTsv("")).toBeNull();
+      expect(parseSolutionsRanksTsv(null)).toBeNull();
+      expect(parseSolutionsRanksTsv("header_only\n")).toBeNull();
     });
   });
 

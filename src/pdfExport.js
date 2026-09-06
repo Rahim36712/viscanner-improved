@@ -218,22 +218,30 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
           .text(sampleName, 0, 10, { width, align: "center" });
 
         // 3. QC Metrics Row (Ploidy, Purity, Confidence)
-        const ploidyVal = meta.ploidy !== undefined ? String(meta.ploidy) : "2.57";
-        const purityVal = meta.purity !== undefined ? String(meta.purity) : "0.65";
-        const confVal = meta.confidence !== undefined ? String(meta.confidence) : "0.86";
+        const hasMetrics =
+          meta.hasMetrics !== false &&
+          meta.ploidy !== undefined &&
+          meta.ploidy !== null &&
+          meta.ploidy !== "";
 
-        pdf.font("Helvetica-Bold").fontSize(10);
-        const fullMetricsStr = `Ploidy: ${ploidyVal}    Purity: ${purityVal}    Confidence: ${confVal}`;
-        const metricsStrWidth = pdf.widthOfString(fullMetricsStr);
-        let startX = Math.max(10, (width - metricsStrWidth) / 2);
-        const metricsY = 28;
+        if (hasMetrics) {
+          const ploidyVal = String(meta.ploidy);
+          const purityVal = meta.purity !== undefined && meta.purity !== null ? String(meta.purity) : "-";
+          const confVal = meta.confidence !== undefined && meta.confidence !== null ? String(meta.confidence) : "-";
 
-        pdf.fillColor("#2D7DD2").text("Ploidy: ", startX, metricsY, { continued: true });
-        pdf.fillColor("#D90429").text(`${ploidyVal}    `, { continued: true });
-        pdf.fillColor("#2D7DD2").text("Purity: ", { continued: true });
-        pdf.fillColor("#D90429").text(`${purityVal}    `, { continued: true });
-        pdf.fillColor("#2D7DD2").text("Confidence: ", { continued: true });
-        pdf.fillColor("#D90429").text(confVal, { continued: false });
+          pdf.font("Helvetica-Bold").fontSize(10);
+          const fullMetricsStr = `Ploidy: ${ploidyVal}    Purity: ${purityVal}    Confidence: ${confVal}`;
+          const metricsStrWidth = pdf.widthOfString(fullMetricsStr);
+          let startX = Math.max(10, (width - metricsStrWidth) / 2);
+          const metricsY = 28;
+
+          pdf.fillColor("#2D7DD2").text("Ploidy: ", startX, metricsY, { continued: true });
+          pdf.fillColor("#D90429").text(`${ploidyVal}    `, { continued: true });
+          pdf.fillColor("#2D7DD2").text("Purity: ", { continued: true });
+          pdf.fillColor("#D90429").text(`${purityVal}    `, { continued: true });
+          pdf.fillColor("#2D7DD2").text("Confidence: ", { continued: true });
+          pdf.fillColor("#D90429").text(confVal, { continued: false });
+        }
 
         // 4. Dot Swatches Row (HP-1, HP-2, BAF only, no duplicate line items)
         const swatchesY = 46;

@@ -94,6 +94,81 @@ export function parseSnpData(v, delimiter = "\t") {
   return higlassData;
 }
 
+export function parseArchiveFilenameMetadata(archiveName) {
+  if (!archiveName || typeof archiveName !== "string") {
+    return { sampleName: null, solutionRank: null };
+  }
+  const cleanName = archiveName.split(/[\\/]/).pop().replace(/\.(zip|rar|tar\.gz|tar)$/i, "");
+  const firstWord = cleanName.split("_")[0];
+  const sampleName = firstWord || cleanName;
+
+  const solutionMatch = cleanName.match(/(?:solution|sol)[_-]?(\d+)/i);
+  const solutionRank = solutionMatch ? solutionMatch[1] : null;
+
+  return {
+    sampleName,
+    solutionRank,
+  };
+}
+
+export function parseSolutionsRanksTsv(text, targetRank = null) {
+  if (!text || typeof text !== "string") return null;
+  const lines = text.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const delimiter = lines[0].includes("\t") ? "\t" : ",";
+  const headers = lines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+
+  const rankIdx = headers.findIndex((h) => h === "solution_rank" || h.includes("rank"));
+  const ploidyIdx = headers.findIndex((h) => h.includes("ploid"));
+  const cellPurityIdx = headers.findIndex((h) => h === "cell_purity" || h.includes("cell_purit"));
+  const dnaPurityIdx = headers.findIndex((h) => h === "dna_purity" || h.includes("dna_purit"));
+  const genericPurityIdx = headers.findIndex((h) => h.includes("purit"));
+  const confIdx = headers.findIndex((h) => h.includes("confid"));
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delimiter).map((v) => v.trim().replace(/['"]/g, ""));
+    const rank = rankIdx !== -1 && cols[rankIdx] !== undefined ? cols[rankIdx] : String(i);
+    const ploidy = ploidyIdx !== -1 && cols[ploidyIdx] !== undefined ? cols[ploidyIdx] : null;
+    const cellPurity = cellPurityIdx !== -1 && cols[cellPurityIdx] !== undefined ? cols[cellPurityIdx] : null;
+    const dnaPurity = dnaPurityIdx !== -1 && cols[dnaPurityIdx] !== undefined ? cols[dnaPurityIdx] : null;
+    const genericPurity = genericPurityIdx !== -1 && cols[genericPurityIdx] !== undefined ? cols[genericPurityIdx] : null;
+    const purity = cellPurity || dnaPurity || genericPurity;
+    const confidence = confIdx !== -1 && cols[confIdx] !== undefined ? cols[confIdx] : null;
+
+    rows.push({
+      rank: rank ? String(rank).trim() : String(i),
+      ploidy,
+      purity,
+      confidence,
+    });
+  }
+
+  let matchedRow = null;
+  if (targetRank !== null && targetRank !== undefined) {
+    const targetStr = String(targetRank).trim();
+    matchedRow = rows.find(
+      (r) => r.rank === targetStr || r.rank.toLowerCase() === `solution_${targetStr}`.toLowerCase()
+    );
+  }
+
+  if (!matchedRow && rows.length > 0) {
+    matchedRow = rows[0];
+  }
+
+  if (matchedRow) {
+    return {
+      ploidy: matchedRow.ploidy,
+      purity: matchedRow.purity,
+      confidence: matchedRow.confidence,
+      solution_rank: matchedRow.rank,
+    };
+  }
+
+  return null;
+}
+
 export function parseSampleMetadataCsv(text) {
   if (!text || typeof text !== "string") return null;
   const lines = text.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -104,13 +179,13 @@ export function parseSampleMetadataCsv(text) {
   const values = lines[1].split(delimiter).map((v) => v.trim().replace(/['"]/g, ""));
 
   const fallbackName =
-    (typeof window !== "undefined" && window._viscannerLoadedSampleName) || "Sample 2009";
+    (typeof window !== "undefined" && window._viscannerLoadedSampleName) || "Sample";
 
   const meta = {
     sample_name: fallbackName,
-    ploidy: "2.57",
-    purity: "0.65",
-    confidence: "0.86",
+    ploidy: null,
+    purity: null,
+    confidence: null,
   };
 
   headers.forEach((header, idx) => {
@@ -684,9 +759,11 @@ function showUploadError(message) {
   window.alert(message);
 }
 
-function parseUploadedEntryTexts(entryTexts, props) {
+function parseUploadedEntryTexts(entryTexts, props, options = {}) {
   let matchedSvIds = [];
   const filenames = Object.keys(entryTexts);
+  const archiveName = (options && options.archiveName) || null;
+  const archiveMeta = archiveName ? parseArchiveFilenameMetadata(archiveName) : null;
 
   // 1. Detect centromere files for GRCh38, GRCh37, and CHM13
   const grch38Filename = filenames.find((f) => {
@@ -753,10 +830,12 @@ function parseUploadedEntryTexts(entryTexts, props) {
     });
 
     if (integerProfileFilename && entryTexts[integerProfileFilename]) {
-      const sampleMatch = integerProfileFilename
-        .replace(/_integer_profile\.bed$/i, "")
-        .replace(/integer_profile\.bed$/i, "")
-        .replace(/\.bed$/i, "");
+      const sampleMatch =
+        (archiveMeta && archiveMeta.sampleName) ||
+        integerProfileFilename
+          .replace(/_integer_profile\.bed$/i, "")
+          .replace(/integer_profile\.bed$/i, "")
+          .replace(/\.bed$/i, "");
       if (sampleMatch && typeof window !== "undefined") {
         window._viscannerLoadedSampleName = sampleMatch;
       }
@@ -811,36 +890,91 @@ function parseUploadedEntryTexts(entryTexts, props) {
     updateBafSnpTrack(parseSnpData(entryTexts["baf.csv"], ","));
   }
 
-  // Detect and parse sample metadata CSV if present
-  const metadataFilename =
-    Object.keys(entryTexts).find((filename) => {
-      const lower = filename.toLowerCase();
-      return (
-        lower.endsWith(".csv") &&
-        (lower.includes("metadata") ||
-          lower.includes("metric") ||
-          lower.includes("sample") ||
-          lower.includes("qc") ||
-          lower.includes("info"))
-      );
-    }) ||
-    Object.keys(entryTexts).find((filename) => {
-      if (!filename.toLowerCase().endsWith(".csv")) return false;
-      const text = entryTexts[filename] || "";
-      const firstLine = text.split(/\r?\n/)[0]?.toLowerCase() || "";
-      return firstLine.includes("ploidy") || firstLine.includes("purity") || firstLine.includes("sample");
-    });
+  // 1. Detect solutions_ranks.tsv
+  const solutionsRanksFilename = Object.keys(entryTexts).find((filename) => {
+    const lower = filename.toLowerCase();
+    return lower.endsWith(".tsv") && lower.includes("solution") && lower.includes("rank");
+  });
 
-  if (metadataFilename && entryTexts[metadataFilename]) {
-    const meta = parseSampleMetadataCsv(entryTexts[metadataFilename]);
-    if (meta) {
-      window._viscannerSampleMetadata = meta;
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("viscanner:sample-metadata-updated", { detail: meta })
+  let sampleMetadata = null;
+
+  if (solutionsRanksFilename && entryTexts[solutionsRanksFilename]) {
+    const targetRank = archiveMeta ? archiveMeta.solutionRank : null;
+    const parsedRank = parseSolutionsRanksTsv(entryTexts[solutionsRanksFilename], targetRank);
+    if (parsedRank) {
+      const sampleName =
+        (archiveMeta && archiveMeta.sampleName) ||
+        (typeof window !== "undefined" && window._viscannerLoadedSampleName) ||
+        "Sample";
+      sampleMetadata = {
+        sample_name: sampleName,
+        ploidy: parsedRank.ploidy,
+        purity: parsedRank.purity,
+        confidence: parsedRank.confidence,
+        solution_rank: parsedRank.solution_rank,
+        hasMetrics: parsedRank.ploidy !== null || parsedRank.purity !== null || parsedRank.confidence !== null,
+      };
+    }
+  }
+
+  // 2. If not solutions_ranks, detect sample metadata CSV if present
+  if (!sampleMetadata) {
+    const metadataFilename =
+      Object.keys(entryTexts).find((filename) => {
+        const lower = filename.toLowerCase();
+        return (
+          lower.endsWith(".csv") &&
+          (lower.includes("metadata") ||
+            lower.includes("metric") ||
+            lower.includes("sample") ||
+            lower.includes("qc") ||
+            lower.includes("info"))
         );
+      }) ||
+      Object.keys(entryTexts).find((filename) => {
+        if (!filename.toLowerCase().endsWith(".csv")) return false;
+        const text = entryTexts[filename] || "";
+        const firstLine = text.split(/\r?\n/)[0]?.toLowerCase() || "";
+        return firstLine.includes("ploidy") || firstLine.includes("purity") || firstLine.includes("sample");
+      });
+
+    if (metadataFilename && entryTexts[metadataFilename]) {
+      const csvMeta = parseSampleMetadataCsv(entryTexts[metadataFilename]);
+      if (csvMeta) {
+        sampleMetadata = {
+          ...csvMeta,
+          hasMetrics: Boolean(csvMeta.ploidy || csvMeta.purity || csvMeta.confidence),
+        };
       }
     }
+  }
+
+  // Finalize sample metadata and name
+  const finalSampleName =
+    (archiveMeta && archiveMeta.sampleName) ||
+    (sampleMetadata && sampleMetadata.sample_name) ||
+    (typeof window !== "undefined" && window._viscannerLoadedSampleName) ||
+    "Sample";
+
+  if (!sampleMetadata) {
+    sampleMetadata = {
+      sample_name: finalSampleName,
+      hasMetrics: false,
+    };
+  } else {
+    sampleMetadata.sample_name = finalSampleName;
+  }
+
+  if (typeof window !== "undefined") {
+    window._viscannerLoadedSampleName = finalSampleName;
+    window._viscannerSampleMetadata = sampleMetadata;
+    window._viscannerDataLoaded = true;
+    window.dispatchEvent(
+      new CustomEvent("viscanner:sample-metadata-updated", { detail: sampleMetadata })
+    );
+    window.dispatchEvent(
+      new CustomEvent("viscanner:data-loaded", { detail: sampleMetadata })
+    );
   }
 
   if (typeof window !== "undefined") {
@@ -864,6 +998,19 @@ async function readZip(file, props) {
 
   try {
     const entries = await zipReader.getEntries();
+    let internalFolderName = null;
+    for (const entry of entries) {
+      const parts = (entry.filename || "").replace(/\\/g, "/").split("/").filter(Boolean);
+      if (parts.length > 1) {
+        internalFolderName = parts[0];
+        break;
+      }
+      if (entry.directory && parts.length === 1) {
+        internalFolderName = parts[0];
+        break;
+      }
+    }
+
     await Promise.all(
       entries.map(async (entry) => {
         if (entry.directory) {
@@ -873,6 +1020,20 @@ async function readZip(file, props) {
         entryTexts[fileBaseName(entry.filename)] = await entry.getData(writer);
       })
     );
+
+    const zipMeta = parseArchiveFilenameMetadata(file.name);
+    const folderMeta = internalFolderName ? parseArchiveFilenameMetadata(internalFolderName) : null;
+
+    let chosenArchiveName = file.name;
+    if (!zipMeta.solutionRank && folderMeta && folderMeta.solutionRank) {
+      chosenArchiveName = internalFolderName;
+    } else if (zipMeta.solutionRank) {
+      chosenArchiveName = file.name;
+    } else if (internalFolderName && folderMeta && folderMeta.sampleName) {
+      chosenArchiveName = internalFolderName;
+    }
+
+    parseUploadedEntryTexts(entryTexts, props, { archiveName: chosenArchiveName });
   } catch (error) {
     throw new Error(
       "ViScanner could not read this archive as a ZIP file. Please remake the archive as a normal .zip, or upload the BED/CSV/VCF files directly."
@@ -880,19 +1041,24 @@ async function readZip(file, props) {
   } finally {
     await zipReader.close().catch(() => {});
   }
-
-  parseUploadedEntryTexts(entryTexts, props);
 }
 
 async function readRawFiles(files, props) {
   const entryTexts = {};
+  let detectedFolder = null;
   await Promise.all(
     files.map(async (file) => {
       entryTexts[fileBaseName(file.name)] = await file.text();
+      if (!detectedFolder && file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.replace(/\\/g, "/").split("/").filter(Boolean);
+        if (parts.length > 1) {
+          detectedFolder = parts[0];
+        }
+      }
     })
   );
 
-  parseUploadedEntryTexts(entryTexts, props);
+  parseUploadedEntryTexts(entryTexts, props, { archiveName: detectedFolder || null });
 }
 
 async function readUploadedFiles(files, props) {
@@ -947,7 +1113,9 @@ export async function loadExampleData(props) {
   try {
     const { getExampleEntryTexts } = await import("./exampleData");
     const entryTexts = await getExampleEntryTexts();
-    parseUploadedEntryTexts(entryTexts, props);
+    parseUploadedEntryTexts(entryTexts, props, {
+      archiveName: "H2009_Solution_1_HiScanner_plots_data.zip",
+    });
     setTimeout(() => {
       resetUploadSpinner();
     }, 1500);
@@ -992,7 +1160,9 @@ const Uploader = (props) => {
     try {
       const { getExampleEntryTexts } = await import("./exampleData");
       const entryTexts = await getExampleEntryTexts();
-      parseUploadedEntryTexts(entryTexts, props);
+      parseUploadedEntryTexts(entryTexts, props, {
+        archiveName: "H2009_Solution_1_HiScanner_plots_data.zip",
+      });
       setTimeout(() => {
         resetUploadSpinner();
         setLoadingExample(false);

@@ -410,29 +410,40 @@ function SvVisibilityControls() {
 }
 
 function SampleLegendBanner() {
+  const [visible, setVisible] = React.useState(() => {
+    return Boolean(typeof window !== "undefined" && window._viscannerDataLoaded);
+  });
   const [metadata, setMetadata] = React.useState(() => {
     if (typeof window !== "undefined" && window._viscannerSampleMetadata) {
       return window._viscannerSampleMetadata;
     }
-    return {
-      sample_name: "1437_merged",
-      ploidy: "2.57",
-      purity: "0.65",
-      confidence: "0.86",
-    };
+    return null;
   });
 
   React.useEffect(() => {
     const handleUpdate = (e) => {
       if (e && e.detail) {
         setMetadata(e.detail);
+        setVisible(true);
+      }
+    };
+    const handleDataLoaded = (e) => {
+      setVisible(true);
+      if (e && e.detail) {
+        setMetadata(e.detail);
       }
     };
     window.addEventListener("viscanner:sample-metadata-updated", handleUpdate);
+    window.addEventListener("viscanner:data-loaded", handleDataLoaded);
     return () => {
       window.removeEventListener("viscanner:sample-metadata-updated", handleUpdate);
+      window.removeEventListener("viscanner:data-loaded", handleDataLoaded);
     };
   }, []);
+
+  if (!visible || !metadata) {
+    return null;
+  }
 
   const svBadges = [
     { label: "DEL", color: "#D90429" },
@@ -443,25 +454,37 @@ function SampleLegendBanner() {
     { label: "LOH", color: "#2D7DD2" },
   ];
 
+  const hasMetrics =
+    metadata.hasMetrics !== false &&
+    metadata.ploidy !== undefined &&
+    metadata.ploidy !== null &&
+    metadata.ploidy !== "";
+
   return (
     <div className="sample-legend-banner text-center py-2 px-3 mb-2 bg-white border rounded shadow-sm">
       {/* Sample ID Title */}
       <div className="fw-bold mb-1" style={{ color: "#D90429", fontSize: "17px" }}>
-        {metadata.sample_name || "1437_merged"}
+        {metadata.sample_name || "Sample"}
       </div>
 
-      {/* QC Metrics Row */}
-      <div className="mb-2" style={{ fontSize: "13px", fontWeight: "600" }}>
-        <span style={{ color: "#2D7DD2" }}>
-          Ploidy: <span style={{ color: "#D90429" }}>{metadata.ploidy ?? "2.57"}</span>
-        </span>
-        <span className="mx-3" style={{ color: "#2D7DD2" }}>
-          Purity: <span style={{ color: "#D90429" }}>{metadata.purity ?? "0.65"}</span>
-        </span>
-        <span style={{ color: "#2D7DD2" }}>
-          Confidence: <span style={{ color: "#D90429" }}>{metadata.confidence ?? "0.86"}</span>
-        </span>
-      </div>
+      {/* QC Metrics Row (only rendered when metrics are available) */}
+      {hasMetrics && (
+        <div className="mb-2" style={{ fontSize: "13px", fontWeight: "600" }}>
+          <span style={{ color: "#2D7DD2" }}>
+            Ploidy: <span style={{ color: "#D90429" }}>{metadata.ploidy}</span>
+          </span>
+          {metadata.purity !== undefined && metadata.purity !== null && (
+            <span className="mx-3" style={{ color: "#2D7DD2" }}>
+              Purity: <span style={{ color: "#D90429" }}>{metadata.purity}</span>
+            </span>
+          )}
+          {metadata.confidence !== undefined && metadata.confidence !== null && (
+            <span style={{ color: "#2D7DD2" }}>
+              Confidence: <span style={{ color: "#D90429" }}>{metadata.confidence}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Legend Dots & Lines */}
       <div className="d-flex flex-wrap justify-content-center align-items-center mb-2" style={{ fontSize: "12px", color: "#555", gap: "14px" }}>
