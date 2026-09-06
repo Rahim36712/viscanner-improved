@@ -4,14 +4,27 @@ const { execSync } = require("child_process");
 
 const dist = path.join(__dirname, "../dist");
 
+function getRemoteUrl(remote) {
+  try {
+    return execSync(`git remote get-url --push ${remote}`, { encoding: "utf8" }).trim().split(/\r?\n/)[0];
+  } catch {
+    try {
+      return execSync(`git remote get-url ${remote}`, { encoding: "utf8" }).trim().split(/\r?\n/)[0];
+    } catch {
+      return null;
+    }
+  }
+}
+
 function publishToRemote(remote) {
   return new Promise((resolve) => {
-    console.log(`🌐 Publishing dist/ to ${remote}/gh-pages...`);
+    const repoUrl = getRemoteUrl(remote);
+    console.log(`🌐 Publishing dist/ to ${remote}/gh-pages (${repoUrl || remote})...`);
     ghpages.publish(
       dist,
       {
         branch: "gh-pages",
-        remote: remote,
+        repo: repoUrl || undefined,
         dotfiles: true,
         message: "Deploy latest production build to gh-pages [auto]",
       },

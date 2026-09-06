@@ -26,30 +26,35 @@ execSync("npm run build", { stdio: "inherit" });
 console.log("🌐 Publishing dist/ to gh-pages branch...");
 execSync("node scripts/publish-gh-pages.js", { stdio: "inherit" });
 
-// Step 3: Stage all source changes on main
+// Step 3: Clean up any stale local gh-pages branch so git never accidentally pushes an old state
+try {
+  const localBranches = execSync("git branch", { encoding: "utf8" });
+  if (localBranches.includes("gh-pages")) {
+    execSync("git branch -D gh-pages", { stdio: "ignore" });
+  }
+} catch {
+  // Ignore branch cleanup errors
+}
+
+// Step 4: Stage all source changes on main
 console.log("📦 Staging source changes on main...");
 execSync("git add -A", { stdio: "inherit" });
 
-// Step 4: Commit changes to main if any
+// Step 5: Commit changes to main if any
 const status = execSync("git status --porcelain", { encoding: "utf8" });
 if (status) {
   console.log("📝 Committing updated source files...");
   execSync('git commit -m "Update source files and build configuration [auto]"', { stdio: "inherit" });
 }
 
-// Step 6: Push main and gh-pages to all remotes
+// Step 6: Push main to all remotes
 const remotes = execSync("git remote", { encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
 remotes.forEach((remote) => {
-  console.log(`🚀 Pushing main and gh-pages to remote: ${remote}...`);
+  console.log(`🚀 Pushing main to remote: ${remote}...`);
   try {
     execSync(`git push ${remote} main`, { stdio: "inherit" });
   } catch (err) {
     console.warn(`Warning: Failed to push main to ${remote}:`, err.message);
-  }
-  try {
-    execSync(`git push ${remote} gh-pages --force`, { stdio: "inherit" });
-  } catch (err) {
-    console.warn(`Warning: Failed to push gh-pages to ${remote}:`, err.message);
   }
 });
 
