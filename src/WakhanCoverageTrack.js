@@ -193,17 +193,31 @@ function nextMultiple(value, step) {
   return Math.ceil(value / step) * step;
 }
 
-function copyNumberEquivalent(rawCoverage, segment) {
-  if (
-    !segment ||
-    !isFiniteNumber(rawCoverage) ||
-    !isFiniteNumber(segment.coverage) ||
-    !isFiniteNumber(segment.copyNumber) ||
-    segment.coverage <= 0
-  ) {
+export function copyNumberEquivalent(rawCoverage, segment, globalScale = 4 / 180) {
+  if (!isFiniteNumber(rawCoverage)) {
     return null;
   }
-  return (rawCoverage / segment.coverage) * segment.copyNumber;
+  if (rawCoverage <= 0) {
+    return 0;
+  }
+  const scale = isFiniteNumber(globalScale) && globalScale > 0 ? globalScale : 4 / 180;
+
+  // If a valid segment exists with positive coverage and positive copy number,
+  // use the segment's calibrated ratio to center points around the integer copy number state.
+  if (
+    segment &&
+    isFiniteNumber(segment.coverage) &&
+    segment.coverage > 0 &&
+    isFiniteNumber(segment.copyNumber) &&
+    segment.copyNumber > 0
+  ) {
+    return (rawCoverage / segment.coverage) * segment.copyNumber;
+  }
+
+  // Fallback for zero copy-number regions (e.g. deletions), zero segment coverage (e.g. centromeres),
+  // or unsegmented genomic bins: scale raw coverage using the global track scale so real sequencing
+  // coverage is accurately represented on the plot and in tooltips rather than discarded or forced to zero.
+  return rawCoverage * scale;
 }
 
 function maxCoverageFromSegments(segments, fallback) {
@@ -301,10 +315,21 @@ function coverageTicks(maxValue) {
   return ticks;
 }
 
-function annotateCoverageRows(coverageRows, hp1Segments, hp2Segments) {
+export function annotateCoverageRows(
+  coverageRows,
+  hp1Segments,
+  hp2Segments,
+  copyNumberMax = 4,
+  coverageMax = 180
+) {
   if (!Array.isArray(coverageRows)) {
     return;
   }
+  const globalScale =
+    isFiniteNumber(copyNumberMax) && isFiniteNumber(coverageMax) && coverageMax > 0
+      ? copyNumberMax / coverageMax
+      : 4 / 180;
+
   const hp1ByChr = groupSegmentsByChr(hp1Segments);
   const hp2ByChr = groupSegmentsByChr(hp2Segments);
   const hp1Pointers = {};
@@ -316,8 +341,8 @@ function annotateCoverageRows(coverageRows, hp1Segments, hp2Segments) {
     const hp2Segment = segmentForRow(row, hp2ByChr, hp2Pointers);
     row.hp1Segment = hp1Segment;
     row.hp2Segment = hp2Segment;
-    row.hp1CopyNumberEquivalent = copyNumberEquivalent(row.hp1, hp1Segment);
-    row.hp2CopyNumberEquivalent = copyNumberEquivalent(row.hp2, hp2Segment);
+    row.hp1CopyNumberEquivalent = copyNumberEquivalent(row.hp1, hp1Segment, globalScale);
+    row.hp2CopyNumberEquivalent = copyNumberEquivalent(row.hp2, hp2Segment, globalScale);
   });
 }
 
@@ -633,7 +658,13 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.copyNumberMax = maxCopyNumberFromSegments(
         this.hp1Segments.concat(this.hp2Segments)
       );
-      annotateCoverageRows(this.coverage, this.hp1Segments, this.hp2Segments);
+      annotateCoverageRows(
+        this.coverage,
+        this.hp1Segments,
+        this.hp2Segments,
+        this.copyNumberMax,
+        this.coverageMax
+      );
 
       const allSegs = (this.hp1Segments || []).concat(this.hp2Segments || []);
       for (let i = 0; i < allSegs.length; i++) {
@@ -1394,27 +1425,33 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
 
       let coverageHit = null;
+      let coverageHitHp = null;
       if (this.showCoverage && Array.isArray(this.currentCoverage) && this.currentCoverage.length > 0) {
         const candidate = binarySearchCoverage(this.currentCoverage, absX);
         if (candidate) {
           const hp1Y = this.yCopyNumber(candidate.hp1CopyNumberEquivalent, 1);
           const hp2Y = this.yCopyNumber(candidate.hp2CopyNumberEquivalent, 2);
-          if (
-            (hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 8) ||
-            (hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 8)
-          ) {
+          const { centerY } = this.metrics();
+          const isTopHalf = trackY <= centerY;
+
+          if (isTopHalf && hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 14) {
             coverageHit = candidate;
+            coverageHitHp = "HP-1";
+          } else if (!isTopHalf && hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 14) {
+            coverageHit = candidate;
+            coverageHitHp = "HP-2";
+          } else if (hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 14) {
+            coverageHit = candidate;
+            coverageHitHp = "HP-1";
+          } else if (hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 14) {
+            coverageHit = candidate;
+            coverageHitHp = "HP-2";
           }
         }
       }
 
       if (coverageHit) {
-        const hp1Y = this.yCopyNumber(coverageHit.hp1CopyNumberEquivalent, 1);
-        const hp2Y = this.yCopyNumber(coverageHit.hp2CopyNumberEquivalent, 2);
-        const hp = hp1Y !== null && isFiniteNumber(hp1Y) && (
-          hp2Y === null || !isFiniteNumber(hp2Y) ||
-          Math.abs(trackY - hp1Y) <= Math.abs(trackY - hp2Y)
-        ) ? "HP-1" : "HP-2";
+        const hp = coverageHitHp || (trackY <= this.metrics().centerY ? "HP-1" : "HP-2");
         const coverage = hp === "HP-1" ? coverageHit.hp1 : coverageHit.hp2;
         const segment = hp === "HP-1" ? coverageHit.hp1Segment : coverageHit.hp2Segment;
         const copyNumberValue =
@@ -1480,17 +1517,40 @@ function WakhanCoverageTrack(HGC, ...args) {
           return y !== null && isFiniteNumber(y) && Math.abs(trackY - y) <= 7;
         });
 
-      if (!segmentHit) {
-        return "";
+      if (segmentHit) {
+        return `<table style="margin-top:3px;border:1px solid #333333;">
+          <tr><td style="font-weight:bold;">Position</td><td>${segmentHit.chr}: ${format(",")(segmentHit.start)} - ${format(",")(segmentHit.end)}</td></tr>
+          <tr><td style="font-weight:bold;">Haplotype</td><td>${segmentHit.hp}</td></tr>
+          <tr><td style="font-weight:bold;">BED segment coverage</td><td>${formatCoverage(segmentHit.coverage)}</td></tr>
+          <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(segmentHit.copyNumber)}</td></tr>
+          <tr><td style="font-weight:bold;">Confidence</td><td>${format(".3f")(segmentHit.confidence)}</td></tr>
+        </table>`;
       }
 
-      return `<table style="margin-top:3px;border:1px solid #333333;">
-        <tr><td style="font-weight:bold;">Position</td><td>${segmentHit.chr}: ${format(",")(segmentHit.start)} - ${format(",")(segmentHit.end)}</td></tr>
-        <tr><td style="font-weight:bold;">Haplotype</td><td>${segmentHit.hp}</td></tr>
-        <tr><td style="font-weight:bold;">BED segment coverage</td><td>${formatCoverage(segmentHit.coverage)}</td></tr>
-        <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(segmentHit.copyNumber)}</td></tr>
-        <tr><td style="font-weight:bold;">Confidence</td><td>${format(".3f")(segmentHit.confidence)}</td></tr>
-      </table>`;
+      // Fallback: If hovering over the track at genomic position absX, and neither an SV line
+      // nor a segment bar was directly under the cursor, show the coverage at this bin.
+      if (this.showCoverage && Array.isArray(this.currentCoverage) && this.currentCoverage.length > 0) {
+        const candidate = binarySearchCoverage(this.currentCoverage, absX);
+        if (candidate) {
+          const hp = trackY <= this.metrics().centerY ? "HP-1" : "HP-2";
+          const coverage = hp === "HP-1" ? candidate.hp1 : candidate.hp2;
+          const segment = hp === "HP-1" ? candidate.hp1Segment : candidate.hp2Segment;
+          const copyNumberValue =
+            hp === "HP-1"
+              ? candidate.hp1CopyNumberEquivalent
+              : candidate.hp2CopyNumberEquivalent;
+          return `<table style="margin-top:3px;border:1px solid #333333;">
+            <tr><td style="font-weight:bold;">Position</td><td>${candidate.chr}: ${format(",")(candidate.start)} - ${format(",")(candidate.end)}</td></tr>
+            <tr><td style="font-weight:bold;">Haplotype</td><td>${hp}</td></tr>
+            <tr><td style="font-weight:bold;">Raw coverage</td><td>${formatCoverage(coverage)}</td></tr>
+            <tr><td style="font-weight:bold;">Copy-number equivalent</td><td>${formatCopyNumber(copyNumberValue)}</td></tr>
+            <tr><td style="font-weight:bold;">BED copy number</td><td>${formatCopyNumber(segment && segment.copyNumber)}</td></tr>
+            <tr><td style="font-weight:bold;">BED segment coverage</td><td>${formatCoverage(segment && segment.coverage)}</td></tr>
+          </table>`;
+        }
+      }
+
+      return "";
     }
 
     exportSVG() {

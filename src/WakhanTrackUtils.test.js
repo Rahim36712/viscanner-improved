@@ -7,6 +7,7 @@ import {
 import {
   binarySearchCoverage,
   filterVisibleCoverageRows,
+  copyNumberEquivalent,
 } from "./WakhanCoverageTrack";
 
 describe("WakhanStructuralVariationTrack Utility Functions", () => {
@@ -156,6 +157,48 @@ describe("WakhanCoverageTrack High-Performance Search & Filtering", () => {
       expect(filterVisibleCoverageRows([], 100000, 200000)).toEqual([]);
       expect(filterVisibleCoverageRows(null, 100000, 200000)).toEqual([]);
       expect(filterVisibleCoverageRows(undefined, 100000, 200000)).toEqual([]);
+    });
+  });
+
+  describe("copyNumberEquivalent", () => {
+    test("scales coverage around integer copy number state for standard segments", () => {
+      const segment = { coverage: 90, copyNumber: 2 };
+      expect(copyNumberEquivalent(45, segment, 4 / 180)).toBeCloseTo(1.0);
+      expect(copyNumberEquivalent(90, segment, 4 / 180)).toBeCloseTo(2.0);
+      expect(copyNumberEquivalent(135, segment, 4 / 180)).toBeCloseTo(3.0);
+    });
+
+    test("scales coverage using global scale for zero copy-number segments (deletions) instead of returning 0", () => {
+      const deletionSegment = { coverage: 1.13, copyNumber: 0 };
+      const globalScale = 4 / 180; // 1 / 45
+      // 45 raw coverage corresponds to 1.0 copy on global scale
+      expect(copyNumberEquivalent(45, deletionSegment, globalScale)).toBeCloseTo(1.0);
+      // Small coverage is preserved rather than squashed to zero
+      expect(copyNumberEquivalent(2.25, deletionSegment, globalScale)).toBeCloseTo(0.05);
+    });
+
+    test("scales coverage using global scale for zero-coverage segments (centromeres) instead of returning null", () => {
+      const centromereSegment = { coverage: 0, copyNumber: 0 };
+      const globalScale = 4 / 180;
+      expect(copyNumberEquivalent(45, centromereSegment, globalScale)).toBeCloseTo(1.0);
+      expect(copyNumberEquivalent(90, centromereSegment, globalScale)).toBeCloseTo(2.0);
+    });
+
+    test("scales coverage using global scale when segment is null or undefined", () => {
+      const globalScale = 4 / 180;
+      expect(copyNumberEquivalent(45, null, globalScale)).toBeCloseTo(1.0);
+      expect(copyNumberEquivalent(45, undefined, globalScale)).toBeCloseTo(1.0);
+    });
+
+    test("returns 0 when rawCoverage is zero or negative", () => {
+      expect(copyNumberEquivalent(0, { coverage: 90, copyNumber: 2 })).toBe(0);
+      expect(copyNumberEquivalent(-10, { coverage: 90, copyNumber: 2 })).toBe(0);
+    });
+
+    test("returns null when rawCoverage is non-finite", () => {
+      expect(copyNumberEquivalent(NaN, { coverage: 90, copyNumber: 2 })).toBeNull();
+      expect(copyNumberEquivalent(null, { coverage: 90, copyNumber: 2 })).toBeNull();
+      expect(copyNumberEquivalent(undefined, { coverage: 90, copyNumber: 2 })).toBeNull();
     });
   });
 });
