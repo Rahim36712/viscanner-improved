@@ -499,17 +499,24 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         logDevSkip(variant, "plotX(startAbs) returned non-finite value", { rawX1 });
         return;
       }
-      const x1 = Math.max(leftAxisX, Math.min(rightAxisX, rawX1));
-      if (!isFiniteNumber(x1)) {
-        logDevSkip(variant, "Bounded x1 is non-finite", { x1, rawX1, leftAxisX, rightAxisX });
-        return;
-      }
 
       const rawX2 = this.plotX(variant.endAbs);
       if (!isFiniteNumber(rawX2)) {
         logDevSkip(variant, "plotX(endAbs) returned non-finite value", { rawX2 });
         return;
       }
+
+      // Skip off-screen arcs where both endpoints are entirely to the left or right
+      if ((rawX1 < leftAxisX - 50 && rawX2 < leftAxisX - 50) || (rawX1 > rightAxisX + 50 && rawX2 > rightAxisX + 50)) {
+        return;
+      }
+
+      const x1 = Math.max(leftAxisX, Math.min(rightAxisX, rawX1));
+      if (!isFiniteNumber(x1)) {
+        logDevSkip(variant, "Bounded x1 is non-finite", { x1, rawX1, leftAxisX, rightAxisX });
+        return;
+      }
+
       const x2 = Math.max(leftAxisX, Math.min(rightAxisX, rawX2));
       if (!isFiniteNumber(x2)) {
         logDevSkip(variant, "Bounded x2 is non-finite", { x2, rawX2, leftAxisX, rightAxisX });
@@ -609,19 +616,27 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         logDevSkip(variant, "plotX(startAbs) returned non-finite value", { rawX });
         return;
       }
+
+      let rawX2 = rawX;
+      if (isFiniteNumber(variant.endAbs)) {
+        const checkRawX2 = this.plotX(variant.endAbs);
+        if (isFiniteNumber(checkRawX2)) {
+          rawX2 = checkRawX2;
+        }
+      }
+
+      // Skip off-screen markers
+      if ((rawX < leftAxisX - 20 && rawX2 < leftAxisX - 20) || (rawX > rightAxisX + 20 && rawX2 > rightAxisX + 20)) {
+        return;
+      }
+
       const x = Math.max(leftAxisX, Math.min(rightAxisX, rawX));
       if (!isFiniteNumber(x)) {
         logDevSkip(variant, "Bounded x is non-finite", { x, rawX });
         return;
       }
 
-      let x2 = x;
-      if (isFiniteNumber(variant.endAbs)) {
-        const rawX2 = this.plotX(variant.endAbs);
-        if (isFiniteNumber(rawX2)) {
-          x2 = Math.max(leftAxisX, Math.min(rightAxisX, rawX2));
-        }
-      }
+      const x2 = Math.max(leftAxisX, Math.min(rightAxisX, rawX2));
 
       const span = Math.abs(x2 - x);
       const plotWidth = Math.max(1, rightAxisX - leftAxisX);

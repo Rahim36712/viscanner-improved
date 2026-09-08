@@ -1114,7 +1114,7 @@ export async function loadExampleData(props) {
     const { getExampleEntryTexts } = await import("./exampleData");
     const entryTexts = await getExampleEntryTexts();
     parseUploadedEntryTexts(entryTexts, props, {
-      archiveName: "H2009_Solution_1_HiScanner_plots_data.zip",
+      archiveName: "H2009_solution_1_HiScanner_plots_data.zip",
     });
     setTimeout(() => {
       resetUploadSpinner();
@@ -1161,7 +1161,7 @@ const Uploader = (props) => {
       const { getExampleEntryTexts } = await import("./exampleData");
       const entryTexts = await getExampleEntryTexts();
       parseUploadedEntryTexts(entryTexts, props, {
-        archiveName: "H2009_Solution_1_HiScanner_plots_data.zip",
+        archiveName: "H2009_solution_1_HiScanner_plots_data.zip",
       });
       setTimeout(() => {
         resetUploadSpinner();

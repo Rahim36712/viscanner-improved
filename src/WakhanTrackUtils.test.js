@@ -4,6 +4,10 @@ import {
   normalizeHpFilter,
   escapeHtml,
 } from "./WakhanStructuralVariationTrack";
+import {
+  binarySearchCoverage,
+  filterVisibleCoverageRows,
+} from "./WakhanCoverageTrack";
 
 describe("WakhanStructuralVariationTrack Utility Functions", () => {
   describe("normalizeTrackData", () => {
@@ -72,6 +76,86 @@ describe("WakhanStructuralVariationTrack Utility Functions", () => {
     test("returns '-' for null or undefined values", () => {
       expect(escapeHtml(null)).toBe("-");
       expect(escapeHtml(undefined)).toBe("-");
+    });
+  });
+});
+
+describe("WakhanCoverageTrack High-Performance Search & Filtering", () => {
+  const sampleCoverage = [
+    { startAbs: 100000, endAbs: 150000, hp1CopyNumberEquivalent: 1.2, hp2CopyNumberEquivalent: 0.9 },
+    { startAbs: 200000, endAbs: 250000, hp1CopyNumberEquivalent: 1.1, hp2CopyNumberEquivalent: 1.0 },
+    { startAbs: 300000, endAbs: 350000, hp1CopyNumberEquivalent: 2.0, hp2CopyNumberEquivalent: 0.1 },
+    { startAbs: 400000, endAbs: 450000, hp1CopyNumberEquivalent: 1.5, hp2CopyNumberEquivalent: 1.5 },
+  ];
+
+  describe("binarySearchCoverage", () => {
+    test("returns exact matching row when absX falls strictly inside bin interval", () => {
+      const match = binarySearchCoverage(sampleCoverage, 220000);
+      expect(match).toBe(sampleCoverage[1]);
+    });
+
+    test("matches at startAbs and endAbs bin boundaries", () => {
+      expect(binarySearchCoverage(sampleCoverage, 100000)).toBe(sampleCoverage[0]);
+      expect(binarySearchCoverage(sampleCoverage, 150000)).toBe(sampleCoverage[0]);
+      expect(binarySearchCoverage(sampleCoverage, 450000)).toBe(sampleCoverage[3]);
+    });
+
+    test("matches nearest neighbor bin when absX is within 50kb tolerance", () => {
+      // 170000 is between [100000, 150000] and [200000, 250000]
+      // Distance to bin 0 mid (125000): 45000 (< 50000)
+      const match = binarySearchCoverage(sampleCoverage, 160000);
+      expect(match).toBe(sampleCoverage[0]);
+    });
+
+    test("returns null when absX is far beyond tolerance (> 50kb)", () => {
+      expect(binarySearchCoverage(sampleCoverage, 20000)).toBeNull();
+      expect(binarySearchCoverage(sampleCoverage, 800000)).toBeNull();
+    });
+
+    test("handles empty rows, null, undefined, and non-finite absX gracefully", () => {
+      expect(binarySearchCoverage([], 220000)).toBeNull();
+      expect(binarySearchCoverage(null, 220000)).toBeNull();
+      expect(binarySearchCoverage(undefined, 220000)).toBeNull();
+      expect(binarySearchCoverage(sampleCoverage, NaN)).toBeNull();
+      expect(binarySearchCoverage(sampleCoverage, Infinity)).toBeNull();
+    });
+  });
+
+  describe("filterVisibleCoverageRows", () => {
+    test("returns only rows overlapping the visible viewport range", () => {
+      const visible = filterVisibleCoverageRows(sampleCoverage, 180000, 320000);
+      expect(visible).toEqual([sampleCoverage[1], sampleCoverage[2]]);
+    });
+
+    test("handles inverted min/max coordinates automatically", () => {
+      const visible = filterVisibleCoverageRows(sampleCoverage, 320000, 180000);
+      expect(visible).toEqual([sampleCoverage[1], sampleCoverage[2]]);
+    });
+
+    test("returns all rows when visible range encompasses all data", () => {
+      const visible = filterVisibleCoverageRows(sampleCoverage, 0, 1000000);
+      expect(visible).toEqual(sampleCoverage);
+    });
+
+    test("returns empty array when visible range is completely before all data", () => {
+      const visible = filterVisibleCoverageRows(sampleCoverage, 10000, 50000);
+      expect(visible).toEqual([]);
+    });
+
+    test("returns empty array when visible range is completely after all data", () => {
+      const visible = filterVisibleCoverageRows(sampleCoverage, 500000, 900000);
+      expect(visible).toEqual([]);
+    });
+
+    test("returns original rows when minAbs or maxAbs is non-finite", () => {
+      expect(filterVisibleCoverageRows(sampleCoverage, NaN, 500000)).toEqual(sampleCoverage);
+      expect(filterVisibleCoverageRows(sampleCoverage, 100000, Infinity)).toEqual(sampleCoverage);
+    });
+
+    test("handles empty rows, null, or undefined gracefully", () => {
+      expect(filterVisibleCoverageRows([], 100000, 200000)).toEqual([]);
+      expect(filterVisibleCoverageRows(null, 100000, 200000)).toEqual([]);
+      expect(filterVisibleCoverageRows(undefined, 100000, 200000)).toEqual([]);
     });
   });
 });

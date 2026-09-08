@@ -3,10 +3,40 @@ const path = require("path");
 const zlib = require("zlib");
 
 const root = path.join(__dirname, "..");
-const folesDir = path.join(root, "examples/source_files");
-const fallbackDir = "d:/internship/files/foles";
+const sourceFilesDir = path.join(root, "examples/source_files");
+const h2009Folder = "d:/internship/files/H2009_solution_1_HiScanner_plots_data";
+const h2009Zip = "d:/internship/files/H2009_solution_1_HiScanner_plots_data.zip";
 
-const sourceDir = fs.existsSync(folesDir) ? folesDir : fallbackDir;
+// Synchronize examples/source_files from H2009_solution_1_HiScanner_plots_data if available
+if (fs.existsSync(h2009Folder)) {
+  if (!fs.existsSync(sourceFilesDir)) {
+    fs.mkdirSync(sourceFilesDir, { recursive: true });
+  }
+  // Clear any existing stale files in sourceFilesDir
+  fs.readdirSync(sourceFilesDir).forEach((file) => {
+    const fPath = path.join(sourceFilesDir, file);
+    if (fs.statSync(fPath).isFile()) {
+      fs.unlinkSync(fPath);
+    }
+  });
+  // Copy all files from H2009 folder
+  fs.readdirSync(h2009Folder).forEach((file) => {
+    const src = path.join(h2009Folder, file);
+    if (fs.statSync(src).isFile() && !file.endsWith(".zip")) {
+      fs.copyFileSync(src, path.join(sourceFilesDir, file));
+    }
+  });
+  console.log("Synchronized examples/source_files from:", h2009Folder);
+}
+
+// Also ensure the zip file is in examples/
+if (fs.existsSync(h2009Zip)) {
+  const destZip = path.join(root, "examples/H2009_solution_1_HiScanner_plots_data.zip");
+  fs.copyFileSync(h2009Zip, destZip);
+  console.log("Copied H2009_solution_1_HiScanner_plots_data.zip to examples/");
+}
+
+const sourceDir = fs.existsSync(sourceFilesDir) ? sourceFilesDir : h2009Folder;
 console.log("Reading example data source files from:", sourceDir);
 
 const entryTexts = {};

@@ -65,6 +65,87 @@ function clampCopyNumber(value, copyNumberMax) {
   return Math.max(0, Math.min(value, copyNumberMax));
 }
 
+export function binarySearchCoverage(rows, absX) {
+  if (!Array.isArray(rows) || rows.length === 0 || !isFiniteNumber(absX)) {
+    return null;
+  }
+  let low = 0;
+  let high = rows.length - 1;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const row = rows[mid];
+    if (!row) {
+      break;
+    }
+    if (absX < row.startAbs) {
+      high = mid - 1;
+    } else if (absX > row.endAbs) {
+      low = mid + 1;
+    } else {
+      return row;
+    }
+  }
+
+  // If exact containment wasn't hit, check the closest neighboring bin within 50kb
+  if (low < rows.length && rows[low]) {
+    const candidate = rows[low];
+    if (Math.abs(absX - (candidate.startAbs + candidate.endAbs) / 2) < 50000) {
+      return candidate;
+    }
+  }
+  if (high >= 0 && rows[high]) {
+    const candidate = rows[high];
+    if (Math.abs(absX - (candidate.startAbs + candidate.endAbs) / 2) < 50000) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+export function filterVisibleCoverageRows(rows, minAbs, maxAbs) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  if (!isFiniteNumber(minAbs) || !isFiniteNumber(maxAbs)) return rows;
+
+  const start = Math.min(minAbs, maxAbs);
+  const end = Math.max(minAbs, maxAbs);
+
+  if (rows[0].startAbs > end || rows[rows.length - 1].endAbs < start) {
+    return [];
+  }
+
+  let low = 0;
+  let high = rows.length - 1;
+  let startIdx = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (rows[mid].endAbs >= start) {
+      startIdx = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+  if (startIdx === -1) return [];
+
+  low = startIdx;
+  high = rows.length - 1;
+  let endIdx = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (rows[mid].startAbs <= end) {
+      endIdx = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  if (endIdx === -1 || startIdx > endIdx) return [];
+  return rows.slice(startIdx, endIdx + 1);
+}
+
 function sampleRows(rows, maxRows) {
   if (!Array.isArray(rows) || rows.length <= maxRows) {
     return rows || [];
@@ -935,6 +1016,9 @@ function WakhanCoverageTrack(HGC, ...args) {
         if (!isFiniteNumber(rawXStart) || !isFiniteNumber(rawXEnd)) {
           return;
         }
+        if (rawXEnd < leftAxisX || rawXStart > rightAxisX) {
+          return;
+        }
 
         const xStart = Math.max(leftAxisX, rawXStart);
         const xEnd = Math.min(rightAxisX, rawXEnd);
@@ -965,6 +1049,9 @@ function WakhanCoverageTrack(HGC, ...args) {
         const rawXStart = this.plotX(region.startAbs);
         const rawXEnd = this.plotX(region.endAbs);
         if (!isFiniteNumber(rawXStart) || !isFiniteNumber(rawXEnd)) {
+          return;
+        }
+        if (rawXEnd < leftAxisX || rawXStart > rightAxisX) {
           return;
         }
 
@@ -1047,7 +1134,7 @@ function WakhanCoverageTrack(HGC, ...args) {
     }
 
     drawCoveragePoints() {
-      if (!this.showCoverage || !Array.isArray(this.currentCoverage)) {
+      if (!this.showCoverage || !Array.isArray(this.currentCoverage) || this.currentCoverage.length === 0) {
         return;
       }
       const hp1Color = this.HGC.utils.colorToHex(HP1_POINT_COLOR);
@@ -1060,75 +1147,123 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
-      const visibleRows = sampleRows(
-        this.currentCoverage,
-        this.options.maxCoveragePoints || 6000
-      );
+      const fromAbs = this.plotAbsFromX(leftAxisX);
+      const toAbs = this.plotAbsFromX(rightAxisX);
+      const margin = isFiniteNumber(fromAbs) && isFiniteNumber(toAbs) ? Math.abs(toAbs - fromAbs) * 0.05 : 0;
+      const minAbs = Math.min(fromAbs, toAbs) - margin;
+      const maxAbs = Math.max(fromAbs, toAbs) + margin;
 
-      // HP1 Points
-      this.coverageGraphics.beginFill(hp1Color, 0.58);
-      visibleRows.forEach((row) => {
-        try {
-          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) {
-            return;
-          }
+      // 1. Fast binary-search viewport filtering
+      const inViewRows = filterVisibleCoverageRows(this.currentCoverage, minAbs, maxAbs);
+      if (inViewRows.length === 0) {
+        return;
+      }
+
+      // 2. High-performance screen-pixel column deduplication
+      // If we have more points than 1.5x the screen width, group by screen pixel column
+      const shouldCluster = inViewRows.length > plotWidth * 1.5;
+
+      const hp1PointsToDraw = [];
+      const hp2PointsToDraw = [];
+
+      if (!shouldCluster) {
+        // Zoomed in: draw every point at 100% full fidelity
+        for (let i = 0; i < inViewRows.length; i++) {
+          const row = inViewRows[i];
+          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) continue;
           const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
-          if (!isFiniteNumber(rawX)) {
-            return;
-          }
+          if (!isFiniteNumber(rawX)) continue;
           const x = leftAxisX + (rawX / rawWidth) * plotWidth;
-          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) {
-            return;
+          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) continue;
+
+          const hp1Y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
+          if (hp1Y !== null && isFiniteNumber(hp1Y)) {
+            hp1PointsToDraw.push({ x, y: hp1Y });
           }
-          const y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
-          if (y === null || !isFiniteNumber(y)) {
-            return;
+          const hp2Y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
+          if (hp2Y !== null && isFiniteNumber(hp2Y)) {
+            hp2PointsToDraw.push({ x, y: hp2Y });
           }
-          safeDrawRect(
-            this.coverageGraphics,
-            x - halfDotSize,
-            y - halfDotSize,
-            COVERAGE_DOT_SIZE,
-            COVERAGE_DOT_SIZE,
-            "drawCoveragePoints:hp1"
-          );
-        } catch (err) {
-          logDevSkip(row, "Exception drawing HP1 coverage point", { error: err?.message });
         }
-      });
+      } else {
+        // Zoomed out: cluster points by integer screen pixel column X to eliminate massive overdraw
+        const hp1ByPixel = new Map();
+        const hp2ByPixel = new Map();
+
+        for (let i = 0; i < inViewRows.length; i++) {
+          const row = inViewRows[i];
+          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) continue;
+          const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
+          if (!isFiniteNumber(rawX)) continue;
+          const px = Math.round(leftAxisX + (rawX / rawWidth) * plotWidth);
+          if (px < leftAxisX || px > rightAxisX) continue;
+
+          const hp1Y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
+          if (hp1Y !== null && isFiniteNumber(hp1Y)) {
+            const existing = hp1ByPixel.get(px);
+            if (!existing) {
+              hp1ByPixel.set(px, { min: hp1Y, max: hp1Y });
+            } else {
+              if (hp1Y < existing.min) existing.min = hp1Y;
+              if (hp1Y > existing.max) existing.max = hp1Y;
+            }
+          }
+
+          const hp2Y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
+          if (hp2Y !== null && isFiniteNumber(hp2Y)) {
+            const existing = hp2ByPixel.get(px);
+            if (!existing) {
+              hp2ByPixel.set(px, { min: hp2Y, max: hp2Y });
+            } else {
+              if (hp2Y < existing.min) existing.min = hp2Y;
+              if (hp2Y > existing.max) existing.max = hp2Y;
+            }
+          }
+        }
+
+        hp1ByPixel.forEach((bounds, px) => {
+          hp1PointsToDraw.push({ x: px, y: bounds.min });
+          if (bounds.max - bounds.min >= 3) {
+            hp1PointsToDraw.push({ x: px, y: bounds.max });
+          }
+        });
+
+        hp2ByPixel.forEach((bounds, px) => {
+          hp2PointsToDraw.push({ x: px, y: bounds.min });
+          if (bounds.max - bounds.min >= 3) {
+            hp2PointsToDraw.push({ x: px, y: bounds.max });
+          }
+        });
+      }
+
+      // Draw HP1 points in single fill pass
+      this.coverageGraphics.beginFill(hp1Color, 0.58);
+      for (let i = 0; i < hp1PointsToDraw.length; i++) {
+        const pt = hp1PointsToDraw[i];
+        safeDrawRect(
+          this.coverageGraphics,
+          pt.x - halfDotSize,
+          pt.y - halfDotSize,
+          COVERAGE_DOT_SIZE,
+          COVERAGE_DOT_SIZE,
+          "drawCoveragePoints:hp1"
+        );
+      }
       this.coverageGraphics.endFill();
 
-      // HP2 Points
+      // Draw HP2 points in single fill pass
       this.coverageGraphics.beginFill(hp2Color, 0.58);
-      visibleRows.forEach((row) => {
-        try {
-          if (!row || !isFiniteNumber(row.startAbs) || !isFiniteNumber(row.endAbs)) {
-            return;
-          }
-          const rawX = this._xScale((row.startAbs + row.endAbs) / 2);
-          if (!isFiniteNumber(rawX)) {
-            return;
-          }
-          const x = leftAxisX + (rawX / rawWidth) * plotWidth;
-          if (!isFiniteNumber(x) || x < leftAxisX || x > rightAxisX) {
-            return;
-          }
-          const y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
-          if (y === null || !isFiniteNumber(y)) {
-            return;
-          }
-          safeDrawRect(
-            this.coverageGraphics,
-            x - halfDotSize,
-            y - halfDotSize,
-            COVERAGE_DOT_SIZE,
-            COVERAGE_DOT_SIZE,
-            "drawCoveragePoints:hp2"
-          );
-        } catch (err) {
-          logDevSkip(row, "Exception drawing HP2 coverage point", { error: err?.message });
-        }
-      });
+      for (let i = 0; i < hp2PointsToDraw.length; i++) {
+        const pt = hp2PointsToDraw[i];
+        safeDrawRect(
+          this.coverageGraphics,
+          pt.x - halfDotSize,
+          pt.y - halfDotSize,
+          COVERAGE_DOT_SIZE,
+          COVERAGE_DOT_SIZE,
+          "drawCoveragePoints:hp2"
+        );
+      }
       this.coverageGraphics.endFill();
     }
 
@@ -1145,6 +1280,9 @@ function WakhanCoverageTrack(HGC, ...args) {
           const rawStartX = this.plotX(segment.startAbs);
           const rawEndX = this.plotX(segment.endAbs);
           if (!isFiniteNumber(rawStartX) || !isFiniteNumber(rawEndX)) {
+            return;
+          }
+          if (rawEndX < leftAxisX || rawStartX > rightAxisX) {
             return;
           }
 
@@ -1255,20 +1393,20 @@ function WakhanCoverageTrack(HGC, ...args) {
         return "";
       }
 
-      const coverageHit = (this.currentCoverage || []).find((row) => {
-        if (!this.showCoverage || !row) {
-          return false;
+      let coverageHit = null;
+      if (this.showCoverage && Array.isArray(this.currentCoverage) && this.currentCoverage.length > 0) {
+        const candidate = binarySearchCoverage(this.currentCoverage, absX);
+        if (candidate) {
+          const hp1Y = this.yCopyNumber(candidate.hp1CopyNumberEquivalent, 1);
+          const hp2Y = this.yCopyNumber(candidate.hp2CopyNumberEquivalent, 2);
+          if (
+            (hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 8) ||
+            (hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 8)
+          ) {
+            coverageHit = candidate;
+          }
         }
-        if (absX < row.startAbs || absX > row.endAbs) {
-          return false;
-        }
-        const hp1Y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
-        const hp2Y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
-        return (
-          (hp1Y !== null && isFiniteNumber(hp1Y) && Math.abs(trackY - hp1Y) <= 6) ||
-          (hp2Y !== null && isFiniteNumber(hp2Y) && Math.abs(trackY - hp2Y) <= 6)
-        );
-      });
+      }
 
       if (coverageHit) {
         const hp1Y = this.yCopyNumber(coverageHit.hp1CopyNumberEquivalent, 1);
