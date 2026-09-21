@@ -235,11 +235,11 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
         // 3. Row 1: Horizontal SV Type Badges (DEL, INV, INS, BND, DUP)
         const svBadgesY = 28;
         const svBadges = [
-          { label: "DEL", color: "#CF0759" },
-          { label: "INV", color: "#2830DE" },
-          { label: "INS", color: "#e0cf03" },
-          { label: "BND", color: "#737373" },
-          { label: "DUP", color: "#178117" },
+          { label: "DEL", color: SV_CONFIG.TYPE_COLORS.DEL },
+          { label: "INV", color: SV_CONFIG.TYPE_COLORS.INV },
+          { label: "INS", color: SV_CONFIG.TYPE_COLORS.INS },
+          { label: "BND", color: SV_CONFIG.TYPE_COLORS.BND },
+          { label: "DUP", color: SV_CONFIG.TYPE_COLORS.DUP },
         ];
 
         const svBadgeWidth = 34;
@@ -262,8 +262,8 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
         // 4. Row 2: LOH Regions & Centromeres on the next line just below SV's colour
         const regionBadgesY = 48;
         const regionBadges = [
-          { label: "LOH Regions", color: "#2980b9" },
-          { label: "Centromeres", color: "#7e1f14" },
+          { label: "LOH Regions", color: TRACK_COLORS.lohRegion },
+          { label: "Centromeres", color: TRACK_COLORS.maskedRegion },
         ];
 
         const regionBadgeWidth = 68;

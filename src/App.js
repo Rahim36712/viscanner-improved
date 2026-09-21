@@ -5,7 +5,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
 import { fitToContent, scheduleFitToContent } from "./higlassLayout";
-import { LABELS, SV_CONFIG, UI_COLORS } from "./labelsConfig";
+import { LABELS, SV_CONFIG, TRACK_COLORS, UI_COLORS } from "./labelsConfig";
 import { DEFAULT_SETTINGS } from "./defaultSettings";
 
 const DEFAULT_WAKHAN_VISIBILITY = {
@@ -446,16 +446,16 @@ function SampleLegendBanner() {
   }
 
   const svBadges = [
-    { label: "DEL", color: "#CF0759" },
-    { label: "INV", color: "#2830DE" },
-    { label: "INS", color: "#e0cf03" },
-    { label: "BND", color: "#737373" },
-    { label: "DUP", color: "#178117" },
+    { label: "DEL", color: SV_CONFIG.TYPE_COLORS.DEL },
+    { label: "INV", color: SV_CONFIG.TYPE_COLORS.INV },
+    { label: "INS", color: SV_CONFIG.TYPE_COLORS.INS },
+    { label: "BND", color: SV_CONFIG.TYPE_COLORS.BND },
+    { label: "DUP", color: SV_CONFIG.TYPE_COLORS.DUP },
   ];
 
   const regionBadges = [
-    { label: "LOH Regions", color: "#2980b9" },
-    { label: "Centromeres", color: "#7e1f14" },
+    { label: "LOH Regions", color: TRACK_COLORS.lohRegion },
+    { label: "Centromeres", color: TRACK_COLORS.maskedRegion },
   ];
 
   const badgeStyle = (color) => ({
@@ -486,11 +486,11 @@ function SampleLegendBanner() {
         }}
       >
         <span className="d-inline-flex align-items-center">
-          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#B23A48", marginRight: "5px" }}></span>
+          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: TRACK_COLORS.hp1, marginRight: "5px" }}></span>
           HP-1
         </span>
         <span className="d-inline-flex align-items-center">
-          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#2D7DD2", marginRight: "5px" }}></span>
+          <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: TRACK_COLORS.hp2, marginRight: "5px" }}></span>
           HP-2
         </span>
         <span className="d-inline-flex align-items-center">
@@ -498,11 +498,11 @@ function SampleLegendBanner() {
           BAF
         </span>
         <span className="d-inline-flex align-items-center">
-          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: "#B23A48", marginRight: "5px" }}></span>
+          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: TRACK_COLORS.hp1, marginRight: "5px" }}></span>
           HP-1
         </span>
         <span className="d-inline-flex align-items-center">
-          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: "#2D7DD2", marginRight: "5px" }}></span>
+          <span style={{ display: "inline-block", width: "16px", height: "3px", backgroundColor: TRACK_COLORS.hp2, marginRight: "5px" }}></span>
           HP-2
         </span>
       </div>

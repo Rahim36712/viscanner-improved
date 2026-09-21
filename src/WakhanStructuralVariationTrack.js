@@ -392,14 +392,14 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         if (!this.hpFilter || this.hpFilter === "1") {
           this.addText(LABELS.tracks.hp1Label, rightAxisX + 10, top + 15, {
             anchorX: 0,
-            fill: TYPE_COLORS.DEL,
+            fill: TRACK_COLORS.hp1,
             fontSize: "12px",
           });
         }
         if (!this.hpFilter || this.hpFilter === "2") {
           this.addText(LABELS.tracks.hp2Label, rightAxisX + 10, top + height - 15, {
             anchorX: 0,
-            fill: "#2D7DD2",
+            fill: TRACK_COLORS.hp2,
             fontSize: "12px",
           });
         }

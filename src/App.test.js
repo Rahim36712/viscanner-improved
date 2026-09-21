@@ -63,4 +63,42 @@ describe('SampleLegendBanner component', () => {
     expect(text).toContain('LOH Regions');
     expect(text).toContain('Centromeres');
   });
+
+  test('badges have background colors matching SV_CONFIG and TRACK_COLORS', () => {
+    window._viscannerDataLoaded = true;
+    window._viscannerSampleMetadata = { sample_name: 'test' };
+
+    ReactDOM.render(<SampleLegendBanner />, container);
+
+    const spans = Array.from(container.querySelectorAll('span'));
+    const findBadge = (text) => spans.find((s) => s.textContent.trim() === text);
+
+    const centromereBadge = findBadge('Centromeres');
+    expect(centromereBadge).toBeDefined();
+    expect(centromereBadge.style.backgroundColor).toBe('rgb(126, 31, 20)'); // #7e1f14
+
+    const lohBadge = findBadge('LOH Regions');
+    expect(lohBadge).toBeDefined();
+    expect(lohBadge.style.backgroundColor).toBe('rgb(41, 128, 185)'); // #2980b9
+
+    const delBadge = findBadge('DEL');
+    expect(delBadge).toBeDefined();
+    expect(delBadge.style.backgroundColor).toBe('rgb(207, 7, 89)'); // #CF0759
+
+    const invBadge = findBadge('INV');
+    expect(invBadge).toBeDefined();
+    expect(invBadge.style.backgroundColor).toBe('rgb(40, 48, 222)'); // #2830DE
+
+    const insBadge = findBadge('INS');
+    expect(insBadge).toBeDefined();
+    expect(insBadge.style.backgroundColor).toBe('rgb(224, 207, 3)'); // #e0cf03
+
+    const bndBadge = findBadge('BND');
+    expect(bndBadge).toBeDefined();
+    expect(bndBadge.style.backgroundColor).toBe('rgb(115, 115, 115)'); // #737373
+
+    const dupBadge = findBadge('DUP');
+    expect(dupBadge).toBeDefined();
+    expect(dupBadge.style.backgroundColor).toBe('rgb(23, 129, 23)'); // #178117
+  });
 });

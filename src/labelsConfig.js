@@ -172,10 +172,10 @@ export const TRACK_COLORS = {
   chromBand: "#e7eaed",     // Chromosome alternating background band color
 
   // Special Genomic Regions Colors
-  maskedRegion: "#E8C766",       // Masked Centromere fill color
-  maskedRegionBorder: "#B58A2A", // Masked Centromere border color
-  lohRegion: "#808080",          // LOH (Loss of Heterozygosity) region fill color
-  lohRegionBorder: "#555555",    // LOH region border color
+  maskedRegion: "#7e1f14",       // Masked Centromere fill color (Red / Brown to match Centromere badge)
+  maskedRegionBorder: "#5c150e", // Masked Centromere border color
+  lohRegion: "#2980b9",          // LOH (Loss of Heterozygosity) region fill color (Blue to match LOH badge)
+  lohRegionBorder: "#1f618d",    // LOH region border color
 };
 
 export const SV_CONFIG = {
@@ -183,12 +183,12 @@ export const SV_CONFIG = {
    * Vibrant, bold, high-contrast colors for Structural Variations.
    */
   TYPE_COLORS: {
-    DEL: "#B82607",   // Bold Crimson / Deep Vivid Red
-    INV: "#D1970F",   // Vivid Sky Blue / Electric Cyan
-    INS: "#0004FF",   // Vivid Magenta / Neon Pink
-    BND: "#616060",   // Near-Black / Dark Graphite
-    DUP: "#399953",   // Bright Amber / Golden Yellow
-    sBND: "#A6A6A6",  // Bright Aqua / Neon Turquoise
+    DEL: "#CF0759",   // Bold Vivid Red / Crimson
+    INV: "#2830DE",   // Deep Blue
+    INS: "#e0cf03",   // Vivid Yellow / Gold
+    BND: "#737373",   // Neutral Grey
+    DUP: "#178117",   // Forest Green
+    sBND: "#737373",  // Neutral Grey (matching BND)
   },
 
   /**
