@@ -179,7 +179,7 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
   const cleanedSvg = sanitizeSvgForPdf(svgMarkup);
   const { width, height } = getSvgSize(cleanedSvg);
 
-  const HEADER_HEIGHT = 86; // Height reserved at the top for sample title, QC metrics & legend
+  const HEADER_HEIGHT = 74; // Height reserved at the top for legend swatches & badges
   const totalHeight = height + HEADER_HEIGHT;
 
   return new Promise((resolve, reject) => {
@@ -210,48 +210,15 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
         // 1. Crisp white background for header area
         pdf.rect(0, 0, width, HEADER_HEIGHT).fill("#ffffff");
 
-        // 2. Sample ID Title (Red, bold, centered)
-        pdf
-          .font("Helvetica-Bold")
-          .fontSize(14)
-          .fillColor("#D90429")
-          .text(sampleName, 0, 10, { width, align: "center" });
-
-        // 3. QC Metrics Row (Ploidy, Purity, Confidence)
-        const hasMetrics =
-          meta.hasMetrics !== false &&
-          meta.ploidy !== undefined &&
-          meta.ploidy !== null &&
-          meta.ploidy !== "";
-
-        if (hasMetrics) {
-          const ploidyVal = String(meta.ploidy);
-          const purityVal = meta.purity !== undefined && meta.purity !== null ? String(meta.purity) : "-";
-          const confVal = meta.confidence !== undefined && meta.confidence !== null ? String(meta.confidence) : "-";
-
-          pdf.font("Helvetica-Bold").fontSize(10);
-          const fullMetricsStr = `Ploidy: ${ploidyVal}    Purity: ${purityVal}    Confidence: ${confVal}`;
-          const metricsStrWidth = pdf.widthOfString(fullMetricsStr);
-          let startX = Math.max(10, (width - metricsStrWidth) / 2);
-          const metricsY = 28;
-
-          pdf.fillColor("#2D7DD2").text("Ploidy: ", startX, metricsY, { continued: true });
-          pdf.fillColor("#D90429").text(`${ploidyVal}    `, { continued: true });
-          pdf.fillColor("#2D7DD2").text("Purity: ", { continued: true });
-          pdf.fillColor("#D90429").text(`${purityVal}    `, { continued: true });
-          pdf.fillColor("#2D7DD2").text("Confidence: ", { continued: true });
-          pdf.fillColor("#D90429").text(confVal, { continued: false });
-        }
-
-        // 4. Dot Swatches Row (HP-1, HP-2, BAF only, no duplicate line items)
-        const swatchesY = 46;
+        // 2. Dot Swatches Row (HP-1, HP-2, BAF only)
+        const swatchesY = 10;
         const swatchItems = [
           { type: "dot", label: "HP-1", color: TRACK_COLORS.hp1 || "#B23A48" },
           { type: "dot", label: "HP-2", color: TRACK_COLORS.hp2 || "#2D7DD2" },
           { type: "dot", label: "BAF", color: "#9A9D32" },
         ];
 
-        pdf.font("Helvetica").fontSize(9);
+        pdf.font("Courier-Bold").fontSize(9);
         let totalSwatchesWidth = 0;
         swatchItems.forEach((item) => {
           totalSwatchesWidth += 12 + pdf.widthOfString(item.label) + 16;
@@ -265,31 +232,53 @@ export function exportSvgAsPdf(svgMarkup, customFilename = null, customMetadata 
           swatchX += pdf.widthOfString(item.label) + 16;
         });
 
-        // 5. Horizontal SV Type Badges synchronized with SV_CONFIG.TYPE_COLORS
-        const badgesY = 64;
-        const badges = [
-          { label: "DEL", color: SV_CONFIG.TYPE_COLORS.DEL || "#B82607" },
-          { label: "INV", color: SV_CONFIG.TYPE_COLORS.INV || "#D1970F" },
-          { label: "INS", color: SV_CONFIG.TYPE_COLORS.INS || "#0004FF" },
-          { label: "BND", color: SV_CONFIG.TYPE_COLORS.BND || "#616060" },
-          { label: "DUP", color: SV_CONFIG.TYPE_COLORS.DUP || "#399953" },
-          { label: "LOH", color: TRACK_COLORS.lohRegionBorder || "#555555" },
+        // 3. Row 1: Horizontal SV Type Badges (DEL, INV, INS, BND, DUP)
+        const svBadgesY = 28;
+        const svBadges = [
+          { label: "DEL", color: "#CF0759" },
+          { label: "INV", color: "#2830DE" },
+          { label: "INS", color: "#e0cf03" },
+          { label: "BND", color: "#737373" },
+          { label: "DUP", color: "#178117" },
         ];
 
-        const badgeWidth = 32;
+        const svBadgeWidth = 34;
         const badgeHeight = 14;
         const badgeGap = 8;
-        const totalBadgesWidth = badges.length * badgeWidth + (badges.length - 1) * badgeGap;
-        let badgeX = Math.max(10, (width - totalBadgesWidth) / 2);
+        const totalSvBadgesWidth = svBadges.length * svBadgeWidth + (svBadges.length - 1) * badgeGap;
+        let svBadgeX = Math.max(10, (width - totalSvBadgesWidth) / 2);
 
-        badges.forEach((b) => {
-          pdf.roundedRect(badgeX, badgesY, badgeWidth, badgeHeight, 2).fill(b.color);
+        svBadges.forEach((b) => {
+          pdf.roundedRect(svBadgeX, svBadgesY, svBadgeWidth, badgeHeight, 2).fill(b.color);
+          pdf.roundedRect(svBadgeX, svBadgesY, svBadgeWidth, badgeHeight, 2).lineWidth(1).stroke("#c7c7c7");
           pdf
-            .font("Helvetica-Bold")
+            .font("Courier-Bold")
             .fontSize(7.5)
             .fillColor("#ffffff")
-            .text(b.label, badgeX, badgesY + 3, { width: badgeWidth, align: "center" });
-          badgeX += badgeWidth + badgeGap;
+            .text(b.label, svBadgeX, svBadgesY + 3, { width: svBadgeWidth, align: "center" });
+          svBadgeX += svBadgeWidth + badgeGap;
+        });
+
+        // 4. Row 2: LOH Regions & Centromeres on the next line just below SV's colour
+        const regionBadgesY = 48;
+        const regionBadges = [
+          { label: "LOH Regions", color: "#2980b9" },
+          { label: "Centromeres", color: "#7e1f14" },
+        ];
+
+        const regionBadgeWidth = 68;
+        const totalRegionBadgesWidth = regionBadges.length * regionBadgeWidth + (regionBadges.length - 1) * badgeGap;
+        let regionBadgeX = Math.max(10, (width - totalRegionBadgesWidth) / 2);
+
+        regionBadges.forEach((b) => {
+          pdf.roundedRect(regionBadgeX, regionBadgesY, regionBadgeWidth, badgeHeight, 2).fill(b.color);
+          pdf.roundedRect(regionBadgeX, regionBadgesY, regionBadgeWidth, badgeHeight, 2).lineWidth(1).stroke("#c7c7c7");
+          pdf
+            .font("Courier-Bold")
+            .fontSize(7.5)
+            .fillColor("#ffffff")
+            .text(b.label, regionBadgeX, regionBadgesY + 3, { width: regionBadgeWidth, align: "center" });
+          regionBadgeX += regionBadgeWidth + badgeGap;
         });
 
         // 6. Draw HiGlass SVG below header

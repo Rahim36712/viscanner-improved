@@ -446,48 +446,45 @@ function SampleLegendBanner() {
   }
 
   const svBadges = [
-    { label: "DEL", color: "#D90429" },
-    { label: "INV", color: "#3A0CA3" },
-    { label: "INS", color: "#B58403" },
-    { label: "BND", color: "#212529" },
-    { label: "DUP", color: "#15803D" },
-    { label: "LOH", color: "#2D7DD2" },
+    { label: "DEL", color: "#CF0759" },
+    { label: "INV", color: "#2830DE" },
+    { label: "INS", color: "#e0cf03" },
+    { label: "BND", color: "#737373" },
+    { label: "DUP", color: "#178117" },
   ];
 
-  const hasMetrics =
-    metadata.hasMetrics !== false &&
-    metadata.ploidy !== undefined &&
-    metadata.ploidy !== null &&
-    metadata.ploidy !== "";
+  const regionBadges = [
+    { label: "LOH Regions", color: "#2980b9" },
+    { label: "Centromeres", color: "#7e1f14" },
+  ];
+
+  const badgeStyle = (color) => ({
+    backgroundColor: color,
+    color: "#ffffff",
+    fontFamily: "'Courier New', monospace",
+    fontWeight: "bold",
+    fontSize: "12px",
+    padding: "2px 8px",
+    border: "2px solid #c7c7c7",
+    borderRadius: "3px",
+    display: "inline-block",
+    letterSpacing: "0.5px",
+    opacity: 0.85,
+  });
 
   return (
     <div className="sample-legend-banner text-center py-2 px-3 mb-2 bg-white border rounded shadow-sm">
-      {/* Sample ID Title */}
-      <div className="fw-bold mb-1" style={{ color: "#D90429", fontSize: "17px" }}>
-        {metadata.sample_name || "Sample"}
-      </div>
-
-      {/* QC Metrics Row (only rendered when metrics are available) */}
-      {hasMetrics && (
-        <div className="mb-2" style={{ fontSize: "13px", fontWeight: "600" }}>
-          <span style={{ color: "#2D7DD2" }}>
-            Ploidy: <span style={{ color: "#D90429" }}>{metadata.ploidy}</span>
-          </span>
-          {metadata.purity !== undefined && metadata.purity !== null && (
-            <span className="mx-3" style={{ color: "#2D7DD2" }}>
-              Purity: <span style={{ color: "#D90429" }}>{metadata.purity}</span>
-            </span>
-          )}
-          {metadata.confidence !== undefined && metadata.confidence !== null && (
-            <span style={{ color: "#2D7DD2" }}>
-              Confidence: <span style={{ color: "#D90429" }}>{metadata.confidence}</span>
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Legend Dots & Lines */}
-      <div className="d-flex flex-wrap justify-content-center align-items-center mb-2" style={{ fontSize: "12px", color: "#555", gap: "14px" }}>
+      <div
+        className="d-flex flex-wrap justify-content-center align-items-center mb-2"
+        style={{
+          fontSize: "12px",
+          color: "#555",
+          gap: "14px",
+          fontFamily: "'Courier New', monospace",
+          fontWeight: "600",
+        }}
+      >
         <span className="d-inline-flex align-items-center">
           <span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#B23A48", marginRight: "5px" }}></span>
           HP-1
@@ -510,22 +507,19 @@ function SampleLegendBanner() {
         </span>
       </div>
 
-      {/* Horizontal SV Type Badges */}
-      <div className="d-flex flex-wrap justify-content-center align-items-center" style={{ gap: "10px" }}>
+      {/* Row 1: Horizontal SV Type Badges */}
+      <div className="d-flex flex-wrap justify-content-center align-items-center mb-2" style={{ gap: "10px" }}>
         {svBadges.map((badge) => (
-          <span
-            key={badge.label}
-            style={{
-              backgroundColor: badge.color,
-              color: "#ffffff",
-              fontWeight: "bold",
-              fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "3px",
-              display: "inline-block",
-              letterSpacing: "0.5px",
-            }}
-          >
+          <span key={badge.label} style={badgeStyle(badge.color)}>
+            {badge.label}
+          </span>
+        ))}
+      </div>
+
+      {/* Row 2: LOH Regions and Centromeres on the next line just below SV's colour */}
+      <div className="d-flex flex-wrap justify-content-center align-items-center" style={{ gap: "10px" }}>
+        {regionBadges.map((badge) => (
+          <span key={badge.label} style={badgeStyle(badge.color)}>
             {badge.label}
           </span>
         ))}
@@ -594,4 +588,5 @@ function App() {
   );
 }
 
+export { SampleLegendBanner };
 export default App;
