@@ -763,6 +763,12 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
     }
 
     getMouseOverHtml(trackX, trackY) {
+      if (typeof window !== "undefined" && (window.__viscannerShiftPressed || window.__viscannerBoxZoomDragging)) {
+        if (this.mouseOverGraphics) {
+          this.mouseOverGraphics.clear();
+        }
+        return "";
+      }
       if (!isFiniteNumber(trackX) || !isFiniteNumber(trackY) || !this.showTrack) {
         return "";
       }

@@ -109,6 +109,9 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
 
   if (originalGetMouseOverHtml) {
     instance.getMouseOverHtml = function patchedGetMouseOverHtml(trackX, trackY) {
+      if (typeof window !== "undefined" && (window.__viscannerShiftPressed || window.__viscannerBoxZoomDragging)) {
+        return "";
+      }
       if (instance.fetchedTiles) {
         Object.values(instance.fetchedTiles).forEach((tile) => {
           if (tile && Array.isArray(tile.tileData)) {

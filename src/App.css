@@ -172,3 +172,11 @@
     transform: rotate(360deg);
   }
 }
+
+/* Hide track mouseover tooltip popover while Shift is held for box zoom */
+body.viscanner-shift-active .track-mouseover-menu {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

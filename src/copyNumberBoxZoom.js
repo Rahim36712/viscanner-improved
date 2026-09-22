@@ -139,6 +139,20 @@ export function isBoxZoomTriggerEvent(event) {
 }
 
 /**
+ * Dismisses and removes all active HiGlass track mouseover menu popovers from the DOM.
+ */
+export function dismissMouseOverTooltips() {
+  if (typeof document !== "undefined") {
+    const menus = document.querySelectorAll(".track-mouseover-menu");
+    menus.forEach((el) => {
+      if (el && typeof el.remove === "function") {
+        el.remove();
+      }
+    });
+  }
+}
+
+/**
  * Initializes Shift + Left-Click drag box zoom on the Copy Number plot.
  * Uses capture-phase event interception to freeze chart panning completely while dragging.
  * 
@@ -186,10 +200,20 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
   function updateHoverCursor(event) {
     if (isDragging) return;
     if (event.shiftKey) {
+      window.__viscannerShiftPressed = true;
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.add("viscanner-shift-active");
+      }
+      dismissMouseOverTooltips();
       const hit = isOverCoveragePlot(event.clientX, event.clientY);
       if (hit) {
         container.style.cursor = "crosshair";
         return;
+      }
+    } else if (window.__viscannerShiftPressed && !event.shiftKey) {
+      window.__viscannerShiftPressed = false;
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.remove("viscanner-shift-active");
       }
     }
     container.style.cursor = "";
@@ -211,6 +235,13 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+
+    window.__viscannerBoxZoomDragging = true;
+    window.__viscannerShiftPressed = true;
+    if (typeof document !== "undefined" && document.body) {
+      document.body.classList.add("viscanner-shift-active");
+    }
+    dismissMouseOverTooltips();
 
     isDragging = true;
     suppressNextClick = true;
@@ -275,6 +306,13 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
     event.stopImmediatePropagation();
 
     isDragging = false;
+    window.__viscannerBoxZoomDragging = false;
+    if (!event.shiftKey) {
+      window.__viscannerShiftPressed = false;
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.remove("viscanner-shift-active");
+      }
+    }
     window.removeEventListener("mousemove", onMouseMoveCapture, { capture: true });
     window.removeEventListener("pointermove", onMouseMoveCapture, { capture: true });
     window.removeEventListener("mouseup", onMouseUpCapture, { capture: true });
@@ -338,14 +376,32 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
 
   function onKeyDown(event) {
     if (event.key === "Shift") {
+      window.__viscannerShiftPressed = true;
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.add("viscanner-shift-active");
+      }
+      dismissMouseOverTooltips();
       container.style.cursor = "crosshair";
     }
   }
 
   function onKeyUp(event) {
     if (event.key === "Shift") {
+      window.__viscannerShiftPressed = false;
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.remove("viscanner-shift-active");
+      }
       container.style.cursor = "";
     }
+  }
+
+  function onWindowBlur() {
+    window.__viscannerShiftPressed = false;
+    window.__viscannerBoxZoomDragging = false;
+    if (typeof document !== "undefined" && document.body) {
+      document.body.classList.remove("viscanner-shift-active");
+    }
+    container.style.cursor = "";
   }
 
   // Intercept events in CAPTURE phase so HiGlass pan listeners never receive them when Shift is held
@@ -356,6 +412,7 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
 
   window.addEventListener("keydown", onKeyDown, { passive: true });
   window.addEventListener("keyup", onKeyUp, { passive: true });
+  window.addEventListener("blur", onWindowBlur, { passive: true });
 
   // Return cleanup function
   return function destroy() {
@@ -366,10 +423,17 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
 
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("blur", onWindowBlur);
     window.removeEventListener("mousemove", onMouseMoveCapture, { capture: true });
     window.removeEventListener("pointermove", onMouseMoveCapture, { capture: true });
     window.removeEventListener("mouseup", onMouseUpCapture, { capture: true });
     window.removeEventListener("pointerup", onMouseUpCapture, { capture: true });
+
+    window.__viscannerShiftPressed = false;
+    window.__viscannerBoxZoomDragging = false;
+    if (typeof document !== "undefined" && document.body) {
+      document.body.classList.remove("viscanner-shift-active");
+    }
 
     container.style.cursor = "";
     document.body.style.cursor = "";

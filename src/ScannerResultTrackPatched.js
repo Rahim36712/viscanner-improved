@@ -310,6 +310,12 @@ function ScannerResultTrackPatched(HGC, ...args) {
   applyScaleConfig();
 
   instance.getMouseOverHtml = function getMouseOverHtml(trackX, trackY) {
+    if (typeof window !== "undefined" && (window.__viscannerShiftPressed || window.__viscannerBoxZoomDragging)) {
+      if (this.mouseOverGraphics) {
+        this.mouseOverGraphics.clear();
+      }
+      return "";
+    }
     if (!Number.isFinite(trackX) || !Number.isFinite(trackY)) {
       return "";
     }

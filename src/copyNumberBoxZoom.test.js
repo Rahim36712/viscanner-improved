@@ -7,6 +7,7 @@ import {
   getCoverageTrackObject,
   getCoveragePlotBoundsInContainer,
   initCopyNumberBoxZoom,
+  dismissMouseOverTooltips,
 } from "./copyNumberBoxZoom";
 
 describe("copyNumberBoxZoom", () => {
@@ -314,6 +315,97 @@ describe("copyNumberBoxZoom", () => {
       expect(container.style.cursor).toBe("");
 
       destroy();
+    });
+
+    test("dismisses active tooltips and sets Shift-active flags when Shift key is pressed", () => {
+      const destroy = initCopyNumberBoxZoom(container, hgcRef);
+
+      const tooltip = document.createElement("div");
+      tooltip.className = "track-mouseover-menu";
+      document.body.appendChild(tooltip);
+
+      expect(document.querySelectorAll(".track-mouseover-menu").length).toBe(1);
+
+      const keyDownEvent = new KeyboardEvent("keydown", { key: "Shift" });
+      window.dispatchEvent(keyDownEvent);
+
+      expect(window.__viscannerShiftPressed).toBe(true);
+      expect(document.body.classList.contains("viscanner-shift-active")).toBe(true);
+      expect(document.querySelectorAll(".track-mouseover-menu").length).toBe(0);
+
+      const keyUpEvent = new KeyboardEvent("keyup", { key: "Shift" });
+      window.dispatchEvent(keyUpEvent);
+
+      expect(window.__viscannerShiftPressed).toBe(false);
+      expect(document.body.classList.contains("viscanner-shift-active")).toBe(false);
+
+      destroy();
+    });
+
+    test("resets Shift flags and classes on window blur", () => {
+      const destroy = initCopyNumberBoxZoom(container, hgcRef);
+
+      const keyDownEvent = new KeyboardEvent("keydown", { key: "Shift" });
+      window.dispatchEvent(keyDownEvent);
+      expect(window.__viscannerShiftPressed).toBe(true);
+      expect(document.body.classList.contains("viscanner-shift-active")).toBe(true);
+
+      window.dispatchEvent(new Event("blur"));
+      expect(window.__viscannerShiftPressed).toBe(false);
+      expect(document.body.classList.contains("viscanner-shift-active")).toBe(false);
+      expect(container.style.cursor).toBe("");
+
+      destroy();
+    });
+
+    test("sets boxZoomDragging flag and removes tooltips during drag", () => {
+      const destroy = initCopyNumberBoxZoom(container, hgcRef);
+
+      const tooltip = document.createElement("div");
+      tooltip.className = "track-mouseover-menu";
+      document.body.appendChild(tooltip);
+
+      const downEvent = new MouseEvent("mousedown", {
+        button: 0,
+        shiftKey: true,
+        clientX: 200,
+        clientY: 200,
+        bubbles: true,
+        cancelable: true,
+      });
+      container.dispatchEvent(downEvent);
+
+      expect(window.__viscannerBoxZoomDragging).toBe(true);
+      expect(document.querySelectorAll(".track-mouseover-menu").length).toBe(0);
+
+      const upEvent = new MouseEvent("mouseup", {
+        shiftKey: false,
+        clientX: 200,
+        clientY: 200,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(upEvent);
+
+      expect(window.__viscannerBoxZoomDragging).toBe(false);
+      expect(window.__viscannerShiftPressed).toBe(false);
+
+      destroy();
+    });
+  });
+
+  describe("dismissMouseOverTooltips", () => {
+    test("removes any .track-mouseover-menu elements from DOM", () => {
+      const el1 = document.createElement("div");
+      el1.className = "track-mouseover-menu";
+      const el2 = document.createElement("div");
+      el2.className = "track-mouseover-menu other-class";
+      document.body.appendChild(el1);
+      document.body.appendChild(el2);
+
+      expect(document.querySelectorAll(".track-mouseover-menu").length).toBe(2);
+      dismissMouseOverTooltips();
+      expect(document.querySelectorAll(".track-mouseover-menu").length).toBe(0);
     });
   });
 });
