@@ -13,6 +13,7 @@ import { scheduleFitToContent } from "./higlassLayout";
 import HiGlassErrorBoundary from "./HiGlassErrorBoundary";
 import viewConfig from "./viewConfig.json";
 import { DEFAULT_SETTINGS } from "./defaultSettings";
+import { initCopyNumberBoxZoom } from "./copyNumberBoxZoom";
 
 function getInitializedViewConfig() {
   const cloned = JSON.parse(JSON.stringify(viewConfig.viewConfig));
@@ -108,8 +109,12 @@ export class HiglassBrowser extends React.PureComponent {
     };
     window.addEventListener("resize", this.handleWindowResize);
 
+    const container = document.getElementById("higlass-container");
+    if (container) {
+      this.cleanupBoxZoom = initCopyNumberBoxZoom(container, this.hgc);
+    }
+
     if (typeof ResizeObserver !== "undefined" && typeof MutationObserver !== "undefined") {
-      const container = document.getElementById("higlass-container");
       if (container) {
         let lastProcessedHeight = 0;
 
@@ -146,6 +151,10 @@ export class HiglassBrowser extends React.PureComponent {
 
   componentWillUnmount() {
     window.removeEventListener("resize", this.handleWindowResize);
+    if (typeof this.cleanupBoxZoom === "function") {
+      this.cleanupBoxZoom();
+      this.cleanupBoxZoom = null;
+    }
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
     }
