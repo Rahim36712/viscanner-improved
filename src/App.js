@@ -541,8 +541,11 @@ function App() {
         </h2>
         <CnvTable />
 
-        <div className="h3 mt-5" id="sec:visualization" style={{ color: UI_COLORS.visualizationSectionTitleColor }}>
+        <div className="h3 mt-5 mb-1" id="sec:visualization" style={{ color: UI_COLORS.visualizationSectionTitleColor }}>
           {LABELS.visualizationSectionTitle}
+        </div>
+        <div className="text-muted small mb-3 font-italic">
+          {LABELS.visualizationSubtitle}
         </div>
         <div className="row mt-4">
           <div className="col-md-3 ">

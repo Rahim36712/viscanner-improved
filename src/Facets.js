@@ -226,7 +226,7 @@ export class Facets extends React.PureComponent {
             <div className="mb-1 mt-2">{LABELS.facets.goToGeneLabel}</div>
             <GeneSearchBox />
             <button
-              className="btn btn-outline-secondary btn-sm btn-block mt-2 mb-3"
+              className="btn btn-primary btn-sm btn-block mt-2 mb-3"
               onClick={resetHiglassView}
               type="button"
             >

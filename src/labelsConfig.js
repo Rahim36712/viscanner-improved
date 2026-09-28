@@ -11,6 +11,7 @@ export const LABELS = {
   // Main Navigation / Header
   appTitle: "HiScanner [Wakhan] visualization",
   visualizationSectionTitle: "Interactive visualization",
+  visualizationSubtitle: "(Hold Shift + Left-Click Drag on the plot to zoom in; Drag normally to pan left/right)",
   exportPdfButton: "Export PDF",
   loadingOverlay: "Loading data",
 
@@ -115,6 +116,7 @@ export const LABELS = {
       copyNumberState: "CN State",
       confidence: "Confidence",
       breakpoints: "Breakpoints",
+      inspectRegion: "Inspect region",
     },
   },
 

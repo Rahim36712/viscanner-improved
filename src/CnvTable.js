@@ -291,30 +291,53 @@ export class CnvTable extends React.PureComponent {
   );
 
   goToHiglass = (chr, start, end) => {
-    const hgc = window.hgc.current;
-    if (!hgc) {
+    const hgc = window.hgc && window.hgc.current;
+    if (!hgc || !hgc.api) {
       console.warn("Higlass component not found.");
       return;
     }
-    document.getElementById("sec:visualization").scrollIntoView(true);
+    const targetElement = document.getElementById("sec:visualization");
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    const startNum = Number(start);
+    const endNum = Number(end);
+    const span = Math.abs(endNum - startNum);
+    let zoomStart = startNum;
+    let zoomEnd = endNum;
+    if (span < 1000000) {
+      const pad = Math.floor((1000000 - span) / 2);
+      zoomStart = Math.max(0, startNum - pad);
+      zoomEnd = endNum + pad;
+    }
 
     setTimeout(() => {
-      const viewconf = hgc.api.getViewConfig();
+      try {
+        const viewconf = hgc.api.getViewConfig();
+        const viewUid = viewconf && viewconf.views && viewconf.views[0] ? viewconf.views[0].uid : "aa";
 
-      ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
-        // Now we can use the chromInfo object to convert
-        .then((chromInfo) => {
-          hgc.api.zoomTo(
-            viewconf.views[0].uid,
-            chromInfo.chrToAbs([chr, start]),
-            chromInfo.chrToAbs([chr, end]),
-            chromInfo.chrToAbs(["chr1", 0]),
-            chromInfo.chrToAbs(["chr1", 1000]),
-            2500 // Animation time
-          );
-          scheduleFitToContent({ delay: 2600 });
-        });
-    }, "500");
+        ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+          .then((chromInfo) => {
+            const startAbs = chromInfo.chrToAbs([chr, zoomStart]);
+            const endAbs = chromInfo.chrToAbs([chr, zoomEnd]);
+            hgc.api.zoomTo(
+              viewUid,
+              startAbs,
+              endAbs,
+              startAbs,
+              endAbs,
+              1500
+            );
+            scheduleFitToContent({ delay: 1600 });
+          })
+          .catch((err) => {
+            console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
+          });
+      } catch (e) {
+        console.error("Error navigating to breakpoint in HiGlass:", e);
+      }
+    }, 400);
   };
 
   render() {
@@ -360,6 +383,9 @@ export class CnvTable extends React.PureComponent {
               Total CN <i className="fa fa-fw fa-sort fas text-muted"></i>
             </th>
             <th>{LABELS.cnvTable.columns.breakpoints}</th>
+            <th className="text-center" scope="col">
+              {LABELS.cnvTable.columns.inspectRegion || "Inspect region"}
+            </th>
           </tr>
         </thead>
       );
@@ -383,6 +409,14 @@ export class CnvTable extends React.PureComponent {
               <td>{this.formatCell(v.hp2Confidence, ".3f")}</td>
               <td>{this.formatCell(v.total_cn, ".2f")}</td>
               <td style={{ maxWidth: "220px", wordBreak: "break-word" }}>{v.breakpoints}</td>
+              <td className="text-center">
+                <i
+                  className="fa fa-eye fas text-primary pointer px-1"
+                  title="Inspect region in visualization"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => this.goToHiglass(v.chr, v.start, v.end)}
+                ></i>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -418,6 +452,9 @@ export class CnvTable extends React.PureComponent {
             <th onClick={() => this.sortTable("baf")}>
               BAF <i className="fa fa-fw fa-sort fas text-muted"></i>
             </th>
+            <th className="text-center" scope="col">
+              {LABELS.cnvTable.columns.inspectRegion || "Inspect region"}
+            </th>
           </tr>
         </thead>
       );
@@ -438,6 +475,14 @@ export class CnvTable extends React.PureComponent {
               <td>{this.formatCell(v.total_cn, ".2f")}</td>
               <td>{this.formatCell(v.rdr, ".3f")}</td>
               <td>{this.formatCell(v.baf, ".3f")}</td>
+              <td className="text-center">
+                <i
+                  className="fa fa-eye fas text-primary pointer px-1"
+                  title="Inspect region in visualization"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => this.goToHiglass(v.chr, v.start, v.end)}
+                ></i>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -448,7 +493,7 @@ export class CnvTable extends React.PureComponent {
       tableBody = (
         <tbody>
           <tr>
-            <td colSpan="11" className="text-center">
+            <td colSpan={this.state.tableType === "wakhan" ? 12 : 9} className="text-center">
               <span className="text-secondary">
                 <i className="fa fa-info-circle fas"></i>
               </span>
