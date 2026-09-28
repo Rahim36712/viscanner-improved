@@ -356,5 +356,8 @@ export function scheduleFitToContent(options = {}) {
 }
 
 export function resetHiglassView() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("viscanner:reset-view"));
+  }
   return fitToContent({ resetLocation: true, preserveLocation: false });
 }

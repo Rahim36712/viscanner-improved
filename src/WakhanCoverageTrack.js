@@ -295,8 +295,9 @@ function integerTicks(maxValue) {
   if (!isFiniteNumber(maxValue) || maxValue < 0) {
     return ticks;
   }
-  for (let tick = 0; tick <= maxValue; tick += 1) {
-    ticks.push(tick);
+  const step = maxValue <= 2 ? 0.5 : 1;
+  for (let tick = 0; tick <= maxValue + 0.0001; tick += step) {
+    ticks.push(Math.round(tick * 10) / 10);
   }
   return ticks;
 }
@@ -306,10 +307,20 @@ function coverageTicks(maxValue) {
   if (!isFiniteNumber(maxValue) || maxValue <= 0) {
     return [0, COVERAGE_TICK_STEP];
   }
-  for (let tick = 0; tick <= maxValue; tick += COVERAGE_TICK_STEP) {
+  let step = COVERAGE_TICK_STEP;
+  if (maxValue <= 50) {
+    step = 10;
+  } else if (maxValue <= 100) {
+    step = 20;
+  } else if (maxValue <= 160) {
+    step = 30;
+  } else {
+    step = 50;
+  }
+  for (let tick = 0; tick <= maxValue; tick += step) {
     ticks.push(tick);
   }
-  if (ticks[ticks.length - 1] !== maxValue) {
+  if (ticks[ticks.length - 1] !== maxValue && maxValue - ticks[ticks.length - 1] >= step * 0.4) {
     ticks.push(maxValue);
   }
   return ticks;
@@ -402,7 +413,17 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.previousToX = Number.MAX_SAFE_INTEGER;
       this.coverageMax = this.options.coverageMax || 180;
       this.copyNumberMax = 4;
+      this.defaultCoverageMax = this.coverageMax;
+      this.defaultCopyNumberMax = this.copyNumberMax;
       this.chromSizes = {};
+
+      this.handleResetY = () => {
+        this.resetYZoom();
+      };
+      if (typeof window !== "undefined") {
+        window.addEventListener("viscanner:reset-view", this.handleResetY);
+        window.addEventListener("viscanner:reset-defaults", this.handleResetY);
+      }
 
       this.initTrack();
 
@@ -658,6 +679,8 @@ function WakhanCoverageTrack(HGC, ...args) {
       this.copyNumberMax = maxCopyNumberFromSegments(
         this.hp1Segments.concat(this.hp2Segments)
       );
+      this.defaultCoverageMax = this.coverageMax;
+      this.defaultCopyNumberMax = this.copyNumberMax;
       annotateCoverageRows(
         this.coverage,
         this.hp1Segments,
@@ -1599,6 +1622,36 @@ function WakhanCoverageTrack(HGC, ...args) {
       super.zoomed(newXScale, newYScale);
       this.updateExistingGraphics();
       this.animate();
+    }
+
+    setYLimits(newCopyNumberMax, newCoverageMax) {
+      if (isFiniteNumber(newCopyNumberMax) && newCopyNumberMax >= 1) {
+        this.copyNumberMax = newCopyNumberMax;
+      }
+      if (isFiniteNumber(newCoverageMax) && newCoverageMax >= 20) {
+        this.coverageMax = newCoverageMax;
+      }
+      this.updateExistingGraphics();
+      this.animate();
+    }
+
+    resetYZoom() {
+      const defaultCopy = this.defaultCopyNumberMax || 4;
+      const defaultCov = this.defaultCoverageMax || (this.options?.coverageMax || 180);
+      this.copyNumberMax = defaultCopy;
+      this.coverageMax = defaultCov;
+      this.updateExistingGraphics();
+      this.animate();
+    }
+
+    remove() {
+      if (typeof window !== "undefined" && this.handleResetY) {
+        window.removeEventListener("viscanner:reset-view", this.handleResetY);
+        window.removeEventListener("viscanner:reset-defaults", this.handleResetY);
+      }
+      if (typeof super.remove === "function") {
+        super.remove();
+      }
     }
   }
 

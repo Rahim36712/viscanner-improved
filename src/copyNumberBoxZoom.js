@@ -331,6 +331,16 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
     const maxContainerX = Math.max(dragStartContainerX, currentX);
     const dragWidth = maxContainerX - minContainerX;
 
+    const currentY = Math.max(
+      activePlotBounds.top,
+      Math.min(activePlotBounds.bottom, event.clientY - activePlotBounds.containerRect.top)
+    );
+
+    const minContainerY = Math.min(dragStartContainerY, currentY);
+    const maxContainerY = Math.max(dragStartContainerY, currentY);
+    const dragHeight = maxContainerY - minContainerY;
+
+    // 1. Horizontal Zoom (X-axis: genomic positions along chromosomes)
     if (dragWidth >= MIN_DRAG_DISTANCE_PX && activeTrack && activeTrack._xScale) {
       // Convert container coordinates back to track local plotX
       const trackBaseX = activePlotBounds.canvasOffsetX + activePlotBounds.trackX;
@@ -356,6 +366,42 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
       }
     }
 
+    // 2. Vertical Zoom (Y-axis: Coverage Depth & Copy Numbers upward and downward)
+    if (dragHeight >= 12 && activeTrack && activePlotBounds.height > 0) {
+      const trackCenterY = activePlotBounds.top + activePlotBounds.height / 2;
+      const halfHeight = activePlotBounds.height / 2;
+
+      // Distance from center baseline to farther edge of drawn box
+      const distTop = Math.abs(trackCenterY - minContainerY);
+      const distBottom = Math.abs(maxContainerY - trackCenterY);
+      const maxDistFromCenter = Math.max(distTop, distBottom);
+
+      const yFraction = halfHeight > 0 ? maxDistFromCenter / halfHeight : 1.0;
+      if (yFraction < 0.92) {
+        const clampedFraction = Math.max(0.2, Math.min(0.9, yFraction));
+        const baseCopy = activeTrack.defaultCopyNumberMax || 4;
+        const baseCov = activeTrack.defaultCoverageMax || (activeTrack.options?.coverageMax || 180);
+        const currentCopy = activeTrack.copyNumberMax || baseCopy;
+        const currentCov = activeTrack.coverageMax || baseCov;
+
+        let newCopy = Math.max(1, Math.round(currentCopy * clampedFraction * 10) / 10);
+        let newCov = Math.max(20, Math.round(currentCov * clampedFraction));
+
+        if (typeof activeTrack.setYLimits === "function") {
+          activeTrack.setYLimits(newCopy, newCov);
+        } else {
+          activeTrack.copyNumberMax = newCopy;
+          activeTrack.coverageMax = newCov;
+          if (typeof activeTrack.updateExistingGraphics === "function") {
+            activeTrack.updateExistingGraphics();
+          }
+          if (typeof activeTrack.animate === "function") {
+            activeTrack.animate();
+          }
+        }
+      }
+    }
+
     activePlotBounds = null;
     activeTrack = null;
     updateHoverCursor(event);
@@ -371,6 +417,81 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
       event.stopPropagation();
       event.stopImmediatePropagation();
       suppressNextClick = false;
+    }
+  }
+
+  function onDblClickCapture(event) {
+    const hit = isOverCoveragePlot(event.clientX, event.clientY);
+    if (!hit) {
+      return;
+    }
+    const track = hit.track;
+    if (track) {
+      if (typeof track.resetYZoom === "function") {
+        track.resetYZoom();
+      } else if (track.defaultCopyNumberMax && track.defaultCoverageMax) {
+        track.copyNumberMax = track.defaultCopyNumberMax;
+        track.coverageMax = track.defaultCoverageMax;
+        if (typeof track.updateExistingGraphics === "function") {
+          track.updateExistingGraphics();
+        }
+        if (typeof track.animate === "function") {
+          track.animate();
+        }
+      }
+    }
+  }
+
+  function onWheelCapture(event) {
+    if (!event.shiftKey) {
+      return;
+    }
+    const hit = isOverCoveragePlot(event.clientX, event.clientY);
+    if (!hit) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const track = hit.track;
+    if (!track) return;
+
+    // deltaY < 0: scroll up -> zoom in vertically (points move upward & downward)
+    // deltaY > 0: scroll down -> zoom out vertically (compress toward center)
+    const factor = event.deltaY < 0 ? 0.85 : 1.18;
+    const baseCopy = track.defaultCopyNumberMax || 4;
+    const baseCov = track.defaultCoverageMax || (track.options?.coverageMax || 180);
+
+    const currentCopy = track.copyNumberMax || baseCopy;
+    const currentCov = track.coverageMax || baseCov;
+
+    let newCopy = currentCopy * factor;
+    let newCov = currentCov * factor;
+
+    if (factor > 1) {
+      newCopy = Math.min(baseCopy, newCopy);
+      newCov = Math.min(baseCov, newCov);
+    } else {
+      newCopy = Math.max(1, newCopy);
+      newCov = Math.max(20, newCov);
+    }
+
+    newCopy = Math.round(newCopy * 10) / 10;
+    newCov = Math.round(newCov);
+
+    if (typeof track.setYLimits === "function") {
+      track.setYLimits(newCopy, newCov);
+    } else {
+      track.copyNumberMax = newCopy;
+      track.coverageMax = newCov;
+      if (typeof track.updateExistingGraphics === "function") {
+        track.updateExistingGraphics();
+      }
+      if (typeof track.animate === "function") {
+        track.animate();
+      }
     }
   }
 
@@ -408,6 +529,8 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
   container.addEventListener("mousedown", onMouseDownCapture, { capture: true, passive: false });
   container.addEventListener("pointerdown", onMouseDownCapture, { capture: true, passive: false });
   container.addEventListener("click", onClickCapture, { capture: true, passive: false });
+  container.addEventListener("dblclick", onDblClickCapture, { capture: true });
+  container.addEventListener("wheel", onWheelCapture, { capture: true, passive: false });
   container.addEventListener("mousemove", updateHoverCursor, { passive: true });
 
   window.addEventListener("keydown", onKeyDown, { passive: true });
@@ -419,6 +542,8 @@ export function initCopyNumberBoxZoom(container, hgcRef, options = {}) {
     container.removeEventListener("mousedown", onMouseDownCapture, { capture: true });
     container.removeEventListener("pointerdown", onMouseDownCapture, { capture: true });
     container.removeEventListener("click", onClickCapture, { capture: true });
+    container.removeEventListener("dblclick", onDblClickCapture, { capture: true });
+    container.removeEventListener("wheel", onWheelCapture, { capture: true });
     container.removeEventListener("mousemove", updateHoverCursor);
 
     window.removeEventListener("keydown", onKeyDown);

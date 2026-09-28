@@ -149,6 +149,18 @@ describe("copyNumberBoxZoom", () => {
         position: [0, 100],
         dimensions: [1000, 300],
         _xScale: fakeScale,
+        copyNumberMax: 4,
+        coverageMax: 180,
+        defaultCopyNumberMax: 4,
+        defaultCoverageMax: 180,
+        setYLimits: jest.fn((copy, cov) => {
+          mockTrack.copyNumberMax = copy;
+          mockTrack.coverageMax = cov;
+        }),
+        resetYZoom: jest.fn(() => {
+          mockTrack.copyNumberMax = mockTrack.defaultCopyNumberMax;
+          mockTrack.coverageMax = mockTrack.defaultCoverageMax;
+        }),
       };
 
       hgcRef = {
@@ -389,6 +401,44 @@ describe("copyNumberBoxZoom", () => {
 
       expect(window.__viscannerBoxZoomDragging).toBe(false);
       expect(window.__viscannerShiftPressed).toBe(false);
+
+      destroy();
+    });
+
+    test("zooms vertical scale on Shift + Wheel over coverage plot", () => {
+      const destroy = initCopyNumberBoxZoom(container, hgcRef);
+
+      const wheelEvent = new WheelEvent("wheel", {
+        shiftKey: true,
+        clientX: 200,
+        clientY: 200,
+        deltaY: -100, // scroll up -> zoom in
+        bubbles: true,
+        cancelable: true,
+      });
+      container.dispatchEvent(wheelEvent);
+
+      expect(mockTrack.setYLimits).toHaveBeenCalled();
+      const calledArgs = mockTrack.setYLimits.mock.calls[0];
+      // Zoom in should reduce copyNumberMax below 4
+      expect(calledArgs[0]).toBeLessThan(4);
+      expect(calledArgs[1]).toBeLessThan(180);
+
+      destroy();
+    });
+
+    test("resets vertical scale on double click over coverage plot", () => {
+      const destroy = initCopyNumberBoxZoom(container, hgcRef);
+
+      const dblClickEvent = new MouseEvent("dblclick", {
+        clientX: 200,
+        clientY: 200,
+        bubbles: true,
+        cancelable: true,
+      });
+      container.dispatchEvent(dblClickEvent);
+
+      expect(mockTrack.resetYZoom).toHaveBeenCalledTimes(1);
 
       destroy();
     });
