@@ -52,6 +52,7 @@ export class CnvTable extends React.PureComponent {
       selectedCentromereBuild: "GRCh38",
       availableCentromereBuilds: { GRCh38: true, GRCh37: true, CHM13: true },
       maskedRegionsByBuild: null,
+      activeRowKey: null,
     };
   }
 
@@ -157,6 +158,7 @@ export class CnvTable extends React.PureComponent {
     ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
       // Now we can use the chromInfo object to convert
       .then((chromInfo) => {
+        this.chromInfo = chromInfo;
         rows.forEach((variant) => {
           if (tableType === "wakhan") {
             const totalCn =
@@ -290,7 +292,11 @@ export class CnvTable extends React.PureComponent {
     </tr>
   );
 
-  goToHiglass = (chr, start, end) => {
+  goToHiglass = (chr, start, end, rowKey) => {
+    if (rowKey) {
+      this.setState({ activeRowKey: rowKey });
+    }
+
     const hgc = window.hgc && window.hgc.current;
     if (!hgc || !hgc.api) {
       console.warn("Higlass component not found.");
@@ -301,43 +307,63 @@ export class CnvTable extends React.PureComponent {
       targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    const startNum = Number(start);
-    const endNum = Number(end);
-    const span = Math.abs(endNum - startNum);
-    let zoomStart = startNum;
-    let zoomEnd = endNum;
-    if (span < 1000000) {
-      const pad = Math.floor((1000000 - span) / 2);
-      zoomStart = Math.max(0, startNum - pad);
-      zoomEnd = endNum + pad;
-    }
-
-    setTimeout(() => {
+    const executeZoom = (chromInfo) => {
       try {
         const viewconf = hgc.api.getViewConfig();
         const viewUid = viewconf && viewconf.views && viewconf.views[0] ? viewconf.views[0].uid : "aa";
 
-        ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
-          .then((chromInfo) => {
-            const startAbs = chromInfo.chrToAbs([chr, zoomStart]);
-            const endAbs = chromInfo.chrToAbs([chr, zoomEnd]);
-            hgc.api.zoomTo(
-              viewUid,
-              startAbs,
-              endAbs,
-              startAbs,
-              endAbs,
-              1500
-            );
-            scheduleFitToContent({ delay: 1600 });
-          })
-          .catch((err) => {
-            console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
-          });
+        const chrLength = (chromInfo && chromInfo.chromLengths && chromInfo.chromLengths[chr]) || 250000000;
+        const startNum = Math.max(0, Math.min(chrLength, Number(start) || 0));
+        const endNum = Math.max(startNum, Math.min(chrLength, Number(end) || startNum));
+        const span = endNum - startNum;
+
+        let zoomStart;
+        let zoomEnd;
+        if (span < 50000) {
+          // Focus tightly on small breakpoints / narrow segments with a 50kb window
+          const center = (startNum + endNum) / 2;
+          const halfWindow = 25000;
+          zoomStart = Math.max(0, Math.round(center - halfWindow));
+          zoomEnd = Math.min(chrLength, Math.round(center + halfWindow));
+        } else {
+          // Add 15% padding on each side for larger segments
+          const pad = Math.round(span * 0.15);
+          zoomStart = Math.max(0, startNum - pad);
+          zoomEnd = Math.min(chrLength, endNum + pad);
+        }
+
+        if (zoomEnd <= zoomStart + 100) {
+          zoomEnd = Math.min(chrLength, zoomStart + 1000);
+        }
+
+        const startAbs = chromInfo.chrToAbs([chr, zoomStart]);
+        const endAbs = chromInfo.chrToAbs([chr, zoomEnd]);
+
+        hgc.api.zoomTo(
+          viewUid,
+          startAbs,
+          endAbs,
+          0,
+          1000,
+          800
+        );
       } catch (e) {
         console.error("Error navigating to breakpoint in HiGlass:", e);
       }
-    }, 400);
+    };
+
+    if (this.chromInfo) {
+      executeZoom(this.chromInfo);
+    } else {
+      ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+        .then((chromInfo) => {
+          this.chromInfo = chromInfo;
+          executeZoom(chromInfo);
+        })
+        .catch((err) => {
+          console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
+        });
+    }
   };
 
   render() {
@@ -396,29 +422,37 @@ export class CnvTable extends React.PureComponent {
 
       tableBody = (
         <tbody>
-          {pageVariants.map((v, i) => (
-            <tr key={`wakhan-${v.chr}-${v.start}-${i}`}>
-              <td>{v.chr}</td>
-              <td>{v.startStr}</td>
-              <td>{v.endStr}</td>
-              <td>{this.formatCell(v.hp1Coverage)}</td>
-              <td>{this.formatCell(v.hp1CopyNumber, ".2f")}</td>
-              <td>{this.formatCell(v.hp1Confidence, ".3f")}</td>
-              <td>{this.formatCell(v.hp2Coverage)}</td>
-              <td>{this.formatCell(v.hp2CopyNumber, ".2f")}</td>
-              <td>{this.formatCell(v.hp2Confidence, ".3f")}</td>
-              <td>{this.formatCell(v.total_cn, ".2f")}</td>
-              <td style={{ maxWidth: "220px", wordBreak: "break-word" }}>{v.breakpoints}</td>
-              <td className="text-center">
-                <i
-                  className="fa fa-eye fas text-primary pointer px-1"
-                  title="Inspect region in visualization"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => this.goToHiglass(v.chr, v.start, v.end)}
-                ></i>
-              </td>
-            </tr>
-          ))}
+          {pageVariants.map((v, i) => {
+            const rowKey = `wakhan-${v.chr}-${v.start}-${v.end}-${i}`;
+            const isActive = this.state.activeRowKey === rowKey;
+            return (
+              <tr
+                key={rowKey}
+                className={isActive ? "table-primary font-weight-bold" : ""}
+                style={isActive ? { backgroundColor: "#e3f2fd" } : {}}
+              >
+                <td>{v.chr}</td>
+                <td>{v.startStr}</td>
+                <td>{v.endStr}</td>
+                <td>{this.formatCell(v.hp1Coverage)}</td>
+                <td>{this.formatCell(v.hp1CopyNumber, ".2f")}</td>
+                <td>{this.formatCell(v.hp1Confidence, ".3f")}</td>
+                <td>{this.formatCell(v.hp2Coverage)}</td>
+                <td>{this.formatCell(v.hp2CopyNumber, ".2f")}</td>
+                <td>{this.formatCell(v.hp2Confidence, ".3f")}</td>
+                <td>{this.formatCell(v.total_cn, ".2f")}</td>
+                <td style={{ maxWidth: "220px", wordBreak: "break-word" }}>{v.breakpoints}</td>
+                <td className="text-center">
+                  <i
+                    className="fa fa-eye fas text-primary pointer px-1"
+                    title="Inspect region in visualization"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => this.goToHiglass(v.chr, v.start, v.end, rowKey)}
+                  ></i>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       );
     } else {
@@ -465,26 +499,34 @@ export class CnvTable extends React.PureComponent {
 
       tableBody = (
         <tbody>
-          {pageVariants.map((v, i) => (
-            <tr key={`hiscanner-${v.chr}-${v.start}-${i}`}>
-              <td>{v.chr}</td>
-              <td>{v.startStr}</td>
-              <td>{v.endStr}</td>
-              <td>{this.formatCell(v.major_cn, ".2f")}</td>
-              <td>{this.formatCell(v.minor_cn, ".2f")}</td>
-              <td>{this.formatCell(v.total_cn, ".2f")}</td>
-              <td>{this.formatCell(v.rdr, ".3f")}</td>
-              <td>{this.formatCell(v.baf, ".3f")}</td>
-              <td className="text-center">
-                <i
-                  className="fa fa-eye fas text-primary pointer px-1"
-                  title="Inspect region in visualization"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => this.goToHiglass(v.chr, v.start, v.end)}
-                ></i>
-              </td>
-            </tr>
-          ))}
+          {pageVariants.map((v, i) => {
+            const rowKey = `hiscanner-${v.chr}-${v.start}-${v.end}-${i}`;
+            const isActive = this.state.activeRowKey === rowKey;
+            return (
+              <tr
+                key={rowKey}
+                className={isActive ? "table-primary font-weight-bold" : ""}
+                style={isActive ? { backgroundColor: "#e3f2fd" } : {}}
+              >
+                <td>{v.chr}</td>
+                <td>{v.startStr}</td>
+                <td>{v.endStr}</td>
+                <td>{this.formatCell(v.major_cn, ".2f")}</td>
+                <td>{this.formatCell(v.minor_cn, ".2f")}</td>
+                <td>{this.formatCell(v.total_cn, ".2f")}</td>
+                <td>{this.formatCell(v.rdr, ".3f")}</td>
+                <td>{this.formatCell(v.baf, ".3f")}</td>
+                <td className="text-center">
+                  <i
+                    className="fa fa-eye fas text-primary pointer px-1"
+                    title="Inspect region in visualization"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => this.goToHiglass(v.chr, v.start, v.end, rowKey)}
+                  ></i>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       );
     }
