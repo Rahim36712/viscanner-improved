@@ -6,7 +6,46 @@ import { ChromosomeInfo } from "higlass/dist/hglib";
 import { format } from "d3-format";
 import Select from "react-select";
 import { scheduleFitToContent } from "./higlassLayout";
-import { LABELS, UI_COLORS } from "./labelsConfig";
+import { LABELS, UI_COLORS, SV_CONFIG } from "./labelsConfig";
+
+function formatSvLength(svlen, pos, pos2) {
+  let len = Number.isFinite(Number(svlen)) ? Math.abs(Number(svlen)) : null;
+  if (!len && Number.isFinite(pos) && Number.isFinite(pos2) && pos !== pos2) {
+    len = Math.abs(pos2 - pos);
+  }
+  if (!len) return "-";
+  if (len >= 1000000) {
+    return (len / 1000000).toFixed(2) + " Mb";
+  }
+  if (len >= 1000) {
+    return (len / 1000).toFixed(1) + " kb";
+  }
+  return len + " bp";
+}
+
+function formatNumber(val, decimals) {
+  if (val === "-" || val === undefined || val === null || Number.isNaN(val)) {
+    return "-";
+  }
+  const num = Number(val);
+  if (!Number.isFinite(num)) return String(val);
+  if (typeof decimals === "number") {
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
+  return num.toLocaleString();
+}
+
+const SV_BADGE_COLORS = {
+  DEL: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.DEL) || "#CF0759",
+  INV: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.INV) || "#2830DE",
+  INS: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.INS) || "#e0cf03",
+  BND: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.BND) || "#737373",
+  DUP: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.DUP) || "#178117",
+  sBND: (SV_CONFIG && SV_CONFIG.TYPE_COLORS && SV_CONFIG.TYPE_COLORS.sBND) || "#737373",
+};
 
 const PAGE_SIZE = 20;
 
@@ -42,6 +81,7 @@ export class CnvTable extends React.PureComponent {
   constructor(props) {
     super(props);
     this.state = {
+      activeTab: "copyNumber",
       variants: [],
       displayedVariants: [],
       tablePage: 0,
@@ -53,10 +93,39 @@ export class CnvTable extends React.PureComponent {
       availableCentromereBuilds: { GRCh38: true, GRCh37: true, CHM13: true },
       maskedRegionsByBuild: null,
       activeRowKey: null,
+      svVariants: [],
+      displayedSvVariants: [],
+      svTablePage: 0,
+      svSelectedChrom: ALL_CHROM,
+      svSortedBy: "",
+      svSortedByOrder: "asc",
     };
   }
 
-  componentDidMount() {}
+  componentDidMount() {
+    this.handleSvVariantsLoaded = (e) => {
+      if (e && e.detail && Array.isArray(e.detail.variants)) {
+        this.populateSvVariants(e.detail.variants);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("viscanner:sv-variants-loaded", this.handleSvVariantsLoaded);
+      if (
+        window._viscannerSvVariants &&
+        Array.isArray(window._viscannerSvVariants) &&
+        window._viscannerSvVariants.length > 0 &&
+        this.state.svVariants.length === 0
+      ) {
+        this.populateSvVariants(window._viscannerSvVariants);
+      }
+    }
+  }
+
+  componentWillUnmount() {
+    if (typeof window !== "undefined" && this.handleSvVariantsLoaded) {
+      window.removeEventListener("viscanner:sv-variants-loaded", this.handleSvVariantsLoaded);
+    }
+  }
 
   handleCentromereBuildChange = (build) => {
     this.setState({ selectedCentromereBuild: build }, () => {
@@ -107,6 +176,37 @@ export class CnvTable extends React.PureComponent {
   };
 
   exportCsv = () => {
+    if (this.state.activeTab === "breakpoints") {
+      if (!this.state.displayedSvVariants || this.state.displayedSvVariants.length === 0) return;
+      const variants = this.state.displayedSvVariants;
+      const headers = ["ID", "Chrom1", "Pos1", "Chrom2", "Pos2", "SV_Type", "Length", "Haplotype", "VAF", "DV_Reads", "Filter"];
+      const rows = variants.map((v) =>
+        [
+          JSON.stringify(v.id || ""),
+          JSON.stringify(v.chr || ""),
+          JSON.stringify(v.pos ?? ""),
+          JSON.stringify(v.chr2 || ""),
+          JSON.stringify(v.pos2 ?? ""),
+          JSON.stringify(v.type || ""),
+          JSON.stringify(v.svlenStr || ""),
+          JSON.stringify(v.hp || ""),
+          JSON.stringify(v.vaf || ""),
+          JSON.stringify(v.dv || ""),
+          JSON.stringify(v.filter || ""),
+        ].join(",")
+      );
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `structural_variation_breakpoints.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
     if (!this.state.displayedVariants || this.state.displayedVariants.length === 0) return;
     const variants = this.state.displayedVariants;
     const keys = Object.keys(variants[0]);
@@ -123,6 +223,111 @@ export class CnvTable extends React.PureComponent {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  populateSvVariants = (rawSvList) => {
+    if (!Array.isArray(rawSvList)) return;
+    const svVariants = [];
+    rawSvList.forEach((v, index) => {
+      if (!v) return;
+      const chr = v.chr || "chr1";
+      const pos = Number.isFinite(v.pos) ? v.pos : 0;
+      const chr2 = v.chr2 || chr;
+      const pos2 = Number.isFinite(v.pos2) ? v.pos2 : pos;
+      const type = (v.type || "BND").toUpperCase();
+      const svlenStr = formatSvLength(v.svlen, pos, pos2);
+      const hp = v.hp === "1" ? "HP-1" : v.hp === "2" ? "HP-2" : "Unphased";
+      const vaf = Number.isFinite(Number(v.vaf)) ? Number(v.vaf).toFixed(2) : (v.vaf || "-");
+      const dv = v.dv || "-";
+
+      svVariants.push({
+        id: v.id || `sv_${index + 1}`,
+        chr,
+        pos,
+        chr2,
+        pos2,
+        posStr: formatNumber(pos),
+        pos2Str: formatNumber(pos2),
+        type,
+        svlen: Number.isFinite(Number(v.svlen)) ? Math.abs(Number(v.svlen)) : (Math.abs(pos2 - pos) || 0),
+        svlenStr,
+        hp,
+        vaf,
+        dv,
+        filter: v.filter || "PASS",
+        raw: v,
+      });
+    });
+
+    svVariants.sort((a, b) => {
+      if (a.chr !== b.chr) return a.chr.localeCompare(b.chr, undefined, { numeric: true });
+      return a.pos - b.pos;
+    });
+
+    this.setState({
+      svVariants: svVariants,
+      displayedSvVariants: svVariants,
+      svSelectedChrom: ALL_CHROM,
+      svSortedBy: "",
+      svSortedByOrder: "asc",
+      svTablePage: 0,
+    });
+  };
+
+  nextSvPage = () => {
+    this.setState((prevState) => ({
+      svTablePage: prevState.svTablePage + 1,
+    }));
+  };
+
+  previousSvPage = () => {
+    this.setState((prevState) => ({
+      svTablePage: prevState.svTablePage - 1,
+    }));
+  };
+
+  selectSvChrom = (selectedChrom) => {
+    if (!selectedChrom || selectedChrom.value === "All") {
+      this.setState({
+        displayedSvVariants: this.state.svVariants,
+        svSelectedChrom: ALL_CHROM,
+        svTablePage: 0,
+      });
+      return;
+    }
+
+    const filtered = this.state.svVariants.filter(
+      (v) => v.chr === selectedChrom.value || v.chr2 === selectedChrom.value
+    );
+
+    this.setState({
+      displayedSvVariants: filtered,
+      svSelectedChrom: selectedChrom,
+      svTablePage: 0,
+    });
+  };
+
+  sortSvTable = (sortKey) => {
+    const displayed = JSON.parse(JSON.stringify(this.state.displayedSvVariants));
+    displayed.sort((a, b) => {
+      if (a[sortKey] === "-") return -1;
+      if (b[sortKey] === "-") return 1;
+      return a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0;
+    });
+
+    let svSortedByOrder = this.state.svSortedByOrder;
+    if (this.state.svSortedBy === sortKey && svSortedByOrder === "asc") {
+      svSortedByOrder = "desc";
+      displayed.reverse();
+    } else {
+      svSortedByOrder = "asc";
+    }
+
+    this.setState({
+      displayedSvVariants: displayed,
+      svSortedBy: sortKey,
+      svSortedByOrder: svSortedByOrder,
+    });
   };
 
   selectChrom = (selectedChrom) => {
@@ -152,81 +357,141 @@ export class CnvTable extends React.PureComponent {
 
   populateTable = (data) => {
     const variants = [];
-    const tableType = data && data.type === "wakhan" ? "wakhan" : "hiscanner";
-    const rows = tableType === "wakhan" ? data.rows : data;
+    let tableType = "hiscanner";
+    let rows = [];
+    let svVariantsRaw = [];
 
-    ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
-      // Now we can use the chromInfo object to convert
-      .then((chromInfo) => {
-        this.chromInfo = chromInfo;
-        rows.forEach((variant) => {
-          if (tableType === "wakhan") {
-            const totalCn =
-              Number.isFinite(variant.hp1CopyNumber) && Number.isFinite(variant.hp2CopyNumber)
-                ? variant.hp1CopyNumber + variant.hp2CopyNumber
-                : "-";
-            variants.push({
-              posAbs: chromInfo.chrToAbs([variant.chr, variant.start]),
-              chr: variant.chr,
-              start: variant.start,
-              end: variant.end,
-              startStr: format(",.0f")(variant.start),
-              endStr: format(",.0f")(variant.end),
-              hp1Coverage: variant.hp1Coverage,
-              hp1CopyNumber: variant.hp1CopyNumber,
-              hp1Confidence: variant.hp1Confidence,
-              hp2Coverage: variant.hp2Coverage,
-              hp2CopyNumber: variant.hp2CopyNumber,
-              hp2Confidence: variant.hp2Confidence,
-              total_cn: totalCn,
-              breakpoints: variant.breakpoints || "-",
-            });
-            return;
-          }
+    if (data && typeof data === "object") {
+      if (data.type === "wakhan") {
+        tableType = "wakhan";
+        rows = data.rows || [];
+        svVariantsRaw = data.svVariants || [];
+      } else if (data.type === "hiscanner") {
+        tableType = "hiscanner";
+        rows = data.rows || [];
+        svVariantsRaw = data.svVariants || [];
+      } else if (Array.isArray(data)) {
+        rows = data;
+        tableType = "hiscanner";
+      }
+    }
 
-          const chrom = variant[0];
-          const start = variant[1];
-          const end = variant[2];
-          const major_cn = variant[3];
-          const minor_cn = variant[4];
-          const total_cn = variant[5];
-          const rdr = variant[6] || "-";
-          const baf = variant[7] || "-";
+    if (svVariantsRaw && svVariantsRaw.length > 0) {
+      this.populateSvVariants(svVariantsRaw);
+    } else if (
+      typeof window !== "undefined" &&
+      window._viscannerSvVariants &&
+      Array.isArray(window._viscannerSvVariants) &&
+      window._viscannerSvVariants.length > 0
+    ) {
+      this.populateSvVariants(window._viscannerSvVariants);
+    }
 
+    const processRows = (chromInfo) => {
+      this.chromInfo = chromInfo;
+      const chrToAbsFn = (chromInfo && typeof chromInfo.chrToAbs === "function")
+        ? (c, p) => chromInfo.chrToAbs([c, p])
+        : (c, p) => p;
+
+      rows.forEach((variant) => {
+        if (tableType === "wakhan") {
+          const totalCn =
+            Number.isFinite(variant.hp1CopyNumber) && Number.isFinite(variant.hp2CopyNumber)
+              ? variant.hp1CopyNumber + variant.hp2CopyNumber
+              : "-";
           variants.push({
-            posAbs: chromInfo.chrToAbs([chrom, start]),
-            chr: chrom,
-            start: start,
-            end: end,
-            startStr: format(",.0f")(start),
-            endStr: format(",.0f")(end),
-            major_cn: major_cn,
-            minor_cn: minor_cn,
-            total_cn: total_cn,
-            rdr: rdr,
-            baf: baf,
+            posAbs: chrToAbsFn(variant.chr, variant.start),
+            chr: variant.chr,
+            start: variant.start,
+            end: variant.end,
+            startStr: formatNumber(variant.start),
+            endStr: formatNumber(variant.end),
+            hp1Coverage: variant.hp1Coverage,
+            hp1CopyNumber: variant.hp1CopyNumber,
+            hp1Confidence: variant.hp1Confidence,
+            hp2Coverage: variant.hp2Coverage,
+            hp2CopyNumber: variant.hp2CopyNumber,
+            hp2Confidence: variant.hp2Confidence,
+            total_cn: totalCn,
+            breakpoints: variant.breakpoints || "-",
           });
-        });
+          return;
+        }
 
-        variants.sort((a, b) => a.posAbs - b.posAbs);
+        const chrom = variant[0];
+        const start = variant[1];
+        const end = variant[2];
+        const major_cn = variant[3];
+        const minor_cn = variant[4];
+        const total_cn = variant[5];
+        const rdr = variant[6] || "-";
+        const baf = variant[7] || "-";
 
-        this.setState({
-          variants: variants,
-          displayedVariants: variants,
-          selectedChrom: ALL_CHROM,
-          sortedBy: "",
-          sortedByOrder: "asc",
-          tablePage: 0,
-          tableType: tableType,
+        variants.push({
+          posAbs: chrToAbsFn(chrom, start),
+          chr: chrom,
+          start: start,
+          end: end,
+          startStr: formatNumber(start),
+          endStr: formatNumber(end),
+          major_cn: major_cn,
+          minor_cn: minor_cn,
+          total_cn: total_cn,
+          rdr: rdr,
+          baf: baf,
         });
       });
+
+      variants.sort((a, b) => a.posAbs - b.posAbs);
+
+      this.setState({
+        variants: variants,
+        displayedVariants: variants,
+        selectedChrom: ALL_CHROM,
+        sortedBy: "",
+        sortedByOrder: "asc",
+        tablePage: 0,
+        tableType: tableType,
+      });
+    };
+
+    if (this.chromInfo) {
+      processRows(this.chromInfo);
+      return;
+    }
+
+    try {
+      const p = typeof ChromosomeInfo === "function"
+        ? ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+        : null;
+      if (p && typeof p.then === "function") {
+        p.then(processRows).catch((err) => {
+          console.error("Error loading ChromosomeInfo:", err);
+          processRows(null);
+        });
+        return;
+      }
+    } catch (e) {
+      console.error("Error invoking ChromosomeInfo:", e);
+    }
+    processRows(null);
   };
 
   formatCell = (value, formatter = ".3f") => {
     if (value === "-" || value === undefined || value === null || Number.isNaN(value)) {
       return "-";
     }
-    return Number.isFinite(value) ? format(formatter)(value) : value;
+    if (!Number.isFinite(value)) return value;
+    try {
+      if (typeof format === "function") {
+        const fn = format(formatter);
+        if (typeof fn === "function") {
+          return fn(value);
+        }
+      }
+    } catch (e) {}
+    const decimals = formatter === ".2f" ? 2 : formatter === ".3f" ? 3 : 0;
+    return formatNumber(value, decimals);
   };
 
   sortableHeader = (label, sortKey) => (
@@ -304,7 +569,12 @@ export class CnvTable extends React.PureComponent {
     }
     const targetElement = document.getElementById("sec:visualization");
     if (targetElement) {
-      targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      const rect = targetElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      window.scrollTo({
+        top: scrollTop + rect.top + 90,
+        behavior: "smooth",
+      });
     }
 
     const executeZoom = (chromInfo) => {
@@ -312,7 +582,8 @@ export class CnvTable extends React.PureComponent {
         const viewconf = hgc.api.getViewConfig();
         const viewUid = viewconf && viewconf.views && viewconf.views[0] ? viewconf.views[0].uid : "aa";
 
-        const chrLength = (chromInfo && chromInfo.chromLengths && chromInfo.chromLengths[chr]) || 250000000;
+        const chrSizes = (chromInfo && (chromInfo.chromSizes || chromInfo.chromLengths)) || {};
+        const chrLength = chrSizes[chr] || 250000000;
         const startNum = Math.max(0, Math.min(chrLength, Number(start) || 0));
         const endNum = Math.max(startNum, Math.min(chrLength, Number(end) || startNum));
         const span = endNum - startNum;
@@ -336,8 +607,12 @@ export class CnvTable extends React.PureComponent {
           zoomEnd = Math.min(chrLength, zoomStart + 1000);
         }
 
-        const startAbs = chromInfo.chrToAbs([chr, zoomStart]);
-        const endAbs = chromInfo.chrToAbs([chr, zoomEnd]);
+        const chrToAbsFn = (chromInfo && typeof chromInfo.chrToAbs === "function")
+          ? (c, p) => chromInfo.chrToAbs([c, p])
+          : (c, p) => p;
+
+        const startAbs = chrToAbsFn(chr, zoomStart);
+        const endAbs = chrToAbsFn(chr, zoomEnd);
 
         hgc.api.zoomTo(
           viewUid,
@@ -348,22 +623,124 @@ export class CnvTable extends React.PureComponent {
           800
         );
       } catch (e) {
+        console.error("Error navigating to region in HiGlass:", e);
+      }
+    };
+
+    if (this.chromInfo) {
+      executeZoom(this.chromInfo);
+      return;
+    }
+
+    try {
+      const p = typeof ChromosomeInfo === "function"
+        ? ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+        : null;
+      if (p && typeof p.then === "function") {
+        p.then((chromInfo) => {
+          this.chromInfo = chromInfo;
+          executeZoom(chromInfo);
+        }).catch((err) => {
+          console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
+          executeZoom(null);
+        });
+        return;
+      }
+    } catch (err) {
+      console.error("Error loading ChromosomeInfo:", err);
+    }
+    executeZoom(null);
+  };
+
+  goToBreakpoint = (chr, pos, chr2, pos2, type, rowKey) => {
+    if (rowKey) {
+      this.setState({ activeRowKey: rowKey });
+    }
+
+    const hgc = window.hgc && window.hgc.current;
+    if (!hgc || !hgc.api || typeof hgc.api.zoomTo !== "function") {
+      console.warn("HiGlass component not found for breakpoint navigation.");
+      return;
+    }
+
+    const targetElement = document.getElementById("sec:visualization");
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    const executeZoom = (chromInfo) => {
+      try {
+        const viewconf = hgc.api.getViewConfig();
+        const viewUid = viewconf && viewconf.views && viewconf.views[0] ? viewconf.views[0].uid : "aa";
+
+        const chrSizes = (chromInfo && (chromInfo.chromSizes || chromInfo.chromLengths)) || {};
+        const chrLength = chrSizes[chr] || 250000000;
+        const posNum = Math.max(0, Math.min(chrLength, Number(pos) || 0));
+        const pos2Num = Number.isFinite(Number(pos2)) ? Math.max(0, Math.min(chrLength, Number(pos2))) : posNum;
+
+        let zoomStart;
+        let zoomEnd;
+
+        const isIntraChrom = (!chr2 || chr2 === chr) && pos2Num !== posNum;
+        if (isIntraChrom) {
+          const minPos = Math.min(posNum, pos2Num);
+          const maxPos = Math.max(posNum, pos2Num);
+          const span = maxPos - minPos;
+          if (span < 50000) {
+            const center = (minPos + maxPos) / 2;
+            zoomStart = Math.max(0, Math.round(center - 25000));
+            zoomEnd = Math.min(chrLength, Math.round(center + 25000));
+          } else {
+            const pad = Math.round(span * 0.15);
+            zoomStart = Math.max(0, minPos - pad);
+            zoomEnd = Math.min(chrLength, maxPos + pad);
+          }
+        } else {
+          // Point SV (INS) or inter-chromosomal translocation (BND)
+          zoomStart = Math.max(0, Math.round(posNum - 25000));
+          zoomEnd = Math.min(chrLength, Math.round(posNum + 25000));
+        }
+
+        if (zoomEnd <= zoomStart + 100) {
+          zoomEnd = Math.min(chrLength, zoomStart + 1000);
+        }
+
+        const chrToAbsFn = (chromInfo && typeof chromInfo.chrToAbs === "function")
+          ? (c, p) => chromInfo.chrToAbs([c, p])
+          : (c, p) => p;
+
+        const startAbs = chrToAbsFn(chr, zoomStart);
+        const endAbs = chrToAbsFn(chr, zoomEnd);
+
+        hgc.api.zoomTo(viewUid, startAbs, endAbs, 0, 1000, 800);
+      } catch (e) {
         console.error("Error navigating to breakpoint in HiGlass:", e);
       }
     };
 
     if (this.chromInfo) {
       executeZoom(this.chromInfo);
-    } else {
-      ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
-        .then((chromInfo) => {
+      return;
+    }
+
+    try {
+      const p = typeof ChromosomeInfo === "function"
+        ? ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
+        : null;
+      if (p && typeof p.then === "function") {
+        p.then((chromInfo) => {
           this.chromInfo = chromInfo;
           executeZoom(chromInfo);
-        })
-        .catch((err) => {
+        }).catch((err) => {
           console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
+          executeZoom(null);
         });
+        return;
+      }
+    } catch (err) {
+      console.error("Error loading ChromosomeInfo:", err);
     }
+    executeZoom(null);
   };
 
   render() {
@@ -582,9 +959,175 @@ export class CnvTable extends React.PureComponent {
       )} of ${variantsToDisplay.length}`;
     }
 
+    // Breakpoints Table headers & body
+    const svTableHead = (
+      <thead>
+        <tr>
+          <th onClick={() => this.sortSvTable("id")}>
+            ID <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th scope="col">
+            Chrom.{" "}
+            <Select
+              className="basic-single d-inline-block"
+              value={this.state.svSelectedChrom}
+              onChange={this.selectSvChrom}
+              options={CHROMS}
+              closeMenuOnSelect={true}
+              placeholder="Select ..."
+              menuPortalTarget={document.body}
+              styles={{
+                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+              }}
+            />
+          </th>
+          <th onClick={() => this.sortSvTable("pos")}>
+            Position / Range <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th onClick={() => this.sortSvTable("type")}>
+            SV Type <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th onClick={() => this.sortSvTable("svlen")}>
+            Length <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th onClick={() => this.sortSvTable("hp")}>
+            Haplotype <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th onClick={() => this.sortSvTable("vaf")}>
+            VAF <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th onClick={() => this.sortSvTable("dv")}>
+            Support (DV) <i className="fa fa-fw fa-sort fas text-muted"></i>
+          </th>
+          <th className="text-center" scope="col">
+            Inspect breakpoint
+          </th>
+        </tr>
+      </thead>
+    );
+
+    const svVariantsToDisplay = this.state.displayedSvVariants || [];
+    const svPageStart = this.state.svTablePage * PAGE_SIZE;
+    const svPageEnd = svPageStart + PAGE_SIZE;
+    const svPageVariants = svVariantsToDisplay.slice(svPageStart, svPageEnd);
+
+    const svTableBody = (
+      <tbody>
+        {svPageVariants.length === 0 ? (
+          <tr>
+            <td colSpan={9} className="text-center text-muted py-4">
+              <i className="fa fa-info-circle fas mr-1"></i>
+              No structural variation breakpoints available. Upload a Severus VCF or load example data.
+            </td>
+          </tr>
+        ) : (
+          svPageVariants.map((v, i) => {
+            const rowKey = `sv-${v.id}-${v.chr}-${v.pos}-${i}`;
+            const isActive = this.state.activeRowKey === rowKey;
+            const badgeColor = SV_BADGE_COLORS[v.type] || "#6c757d";
+            const isDifferentChr = v.chr2 && v.chr2 !== v.chr;
+            const rangeDisplay = isDifferentChr
+              ? `${v.chr}:${v.posStr} ➔ ${v.chr2}:${v.pos2Str}`
+              : v.pos !== v.pos2
+              ? `${v.posStr} – ${v.pos2Str}`
+              : v.posStr;
+
+            return (
+              <tr
+                key={rowKey}
+                className={isActive ? "table-primary font-weight-bold" : ""}
+                style={isActive ? { backgroundColor: "#e3f2fd" } : {}}
+              >
+                <td className="font-italic small text-secondary">{v.id}</td>
+                <td>
+                  <span className="badge badge-light border">{v.chr}</span>
+                  {isDifferentChr && (
+                    <span className="badge badge-light border ml-1">➔ {v.chr2}</span>
+                  )}
+                </td>
+                <td>{rangeDisplay}</td>
+                <td>
+                  <span
+                    className="badge text-white px-2 py-1"
+                    style={{ backgroundColor: badgeColor, letterSpacing: "0.5px" }}
+                  >
+                    {v.type}
+                  </span>
+                </td>
+                <td>{v.svlenStr}</td>
+                <td>
+                  <span
+                    className={`badge ${
+                      v.hp === "HP-1"
+                        ? "badge-danger"
+                        : v.hp === "HP-2"
+                        ? "badge-primary"
+                        : "badge-secondary"
+                    }`}
+                  >
+                    {v.hp}
+                  </span>
+                </td>
+                <td>{v.vaf}</td>
+                <td>{v.dv}</td>
+                <td className="text-center">
+                  <i
+                    className="fa fa-eye fas text-primary pointer px-1"
+                    title="Inspect breakpoint in visualization"
+                    style={{ cursor: "pointer", fontSize: "16px" }}
+                    onClick={() =>
+                      this.goToBreakpoint(v.chr, v.pos, v.chr2, v.pos2, v.type, rowKey)
+                    }
+                  ></i>
+                </td>
+              </tr>
+            );
+          })
+        )}
+      </tbody>
+    );
+
+    const svNavButtons = [];
+
+    if (
+      svVariantsToDisplay.length > PAGE_SIZE &&
+      (this.state.svTablePage + 1) * PAGE_SIZE <= svVariantsToDisplay.length
+    ) {
+      svNavButtons.push(
+        <button className="btn btn-primary btn-sm" onClick={this.nextSvPage} key="next-sv-btn">
+          {LABELS.cnvTable.nextButton || "Next"}
+        </button>
+      );
+    }
+
+    if (this.state.svTablePage > 0) {
+      svNavButtons.push(
+        <button
+          className="btn btn-primary btn-sm mx-2"
+          onClick={this.previousSvPage}
+          key="prev-sv-btn"
+        >
+          {LABELS.cnvTable.previousButton || "Previous"}
+        </button>
+      );
+    }
+
+    let svMessage = "";
+    if (svVariantsToDisplay.length > 0) {
+      svMessage = `Displaying breakpoints ${
+        this.state.svTablePage * PAGE_SIZE + 1
+      }-${Math.min(
+        (this.state.svTablePage + 1) * PAGE_SIZE,
+        svVariantsToDisplay.length
+      )} of ${svVariantsToDisplay.length}`;
+    }
+
+    const cnCount = this.state.variants ? this.state.variants.length : 0;
+    const svCount = this.state.svVariants ? this.state.svVariants.length : 0;
+
     return (
       <React.Fragment>
-        <div className="row mt-4 mb-5">
+        <div className="row mt-4 mb-4">
           <div className="col-12 ">
             <div className="text-center">
               <div className="my-1" style={{ color: UI_COLORS.uploaderTitleColor }}>
@@ -626,32 +1169,115 @@ export class CnvTable extends React.PureComponent {
           </div>
         </div>
 
-        <div className="h3">
-          {this.state.tableType === "wakhan" ? LABELS.cnvTable.wakhanTitle : LABELS.cnvTable.variantTitle}
-        </div>
+        {/* Navigation Tabs for Copy Number vs Breakpoints */}
+        <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom mb-3 pt-2">
+          <ul className="nav nav-tabs border-bottom-0" role="tablist">
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link font-weight-bold ${this.state.activeTab === "copyNumber" ? "active text-primary" : "text-secondary"}`}
+                style={{
+                  borderTop: this.state.activeTab === "copyNumber" ? "3px solid #007bff" : "3px solid transparent",
+                  fontSize: "15px",
+                  cursor: "pointer",
+                }}
+                onClick={() => this.setState({ activeTab: "copyNumber", activeRowKey: null })}
+              >
+                <i className="fa fa-chart-bar fas mr-2"></i>
+                Copy Number
+                <span className={`badge ${this.state.activeTab === "copyNumber" ? "badge-primary" : "badge-secondary"} badge-pill ml-2`} style={{ fontSize: "11px" }}>
+                  {cnCount}
+                </span>
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link font-weight-bold ${this.state.activeTab === "breakpoints" ? "active text-primary" : "text-secondary"}`}
+                style={{
+                  borderTop: this.state.activeTab === "breakpoints" ? "3px solid #007bff" : "3px solid transparent",
+                  fontSize: "15px",
+                  cursor: "pointer",
+                }}
+                onClick={() => this.setState({ activeTab: "breakpoints", activeRowKey: null })}
+              >
+                <i className="fa fa-bezier-curve fas mr-2"></i>
+                Breakpoints
+                <span className={`badge ${this.state.activeTab === "breakpoints" ? "badge-primary" : "badge-secondary"} badge-pill ml-2`} style={{ fontSize: "11px" }}>
+                  {svCount}
+                </span>
+              </button>
+            </li>
+          </ul>
 
-        <div className="d-flex flex-row-reverse mb-2">
-          {navButtons}
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm mx-2"
-            onClick={this.exportCsv}
-          >
-            <i className="fa fa-download fas mr-1"></i>
-            {LABELS.cnvTable.exportCsvButton}
-          </button>
-          <div className="pt-1 mx-2">{message}</div>
-        </div>
-        <div className="row">
-          <div className="col-12">
-            <div className="table-responsive-lg">
-              <table className="table table-hover table-sm">
-                {tableHead}
-                {tableBody}
-              </table>
-            </div>
+          <div className="text-muted small py-2">
+            {this.state.activeTab === "copyNumber" ? (
+              <span><i className="fa fa-info-circle fas mr-1"></i>Showing phased copy number segments &amp; coverage</span>
+            ) : (
+              <span><i className="fa fa-info-circle fas mr-1"></i>Showing structural variation breakpoints</span>
+            )}
           </div>
         </div>
+
+        {this.state.activeTab === "copyNumber" ? (
+          <React.Fragment>
+            <div className="h3">
+              {this.state.tableType === "wakhan" ? LABELS.cnvTable.wakhanTitle : LABELS.cnvTable.variantTitle}
+            </div>
+
+            <div className="d-flex flex-row-reverse mb-2">
+              {navButtons}
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm mx-2"
+                onClick={this.exportCsv}
+              >
+                <i className="fa fa-download fas mr-1"></i>
+                {LABELS.cnvTable.exportCsvButton}
+              </button>
+              <div className="pt-1 mx-2">{message}</div>
+            </div>
+            <div className="row">
+              <div className="col-12">
+                <div className="table-responsive-lg">
+                  <table className="table table-hover table-sm">
+                    {tableHead}
+                    {tableBody}
+                  </table>
+                </div>
+              </div>
+            </div>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <div className="h3">
+              Structural Variation Breakpoints
+            </div>
+
+            <div className="d-flex flex-row-reverse mb-2">
+              {svNavButtons}
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm mx-2"
+                onClick={this.exportCsv}
+              >
+                <i className="fa fa-download fas mr-1"></i>
+                {LABELS.cnvTable.exportCsvButton}
+              </button>
+              <div className="pt-1 mx-2">{svMessage}</div>
+            </div>
+            <div className="row">
+              <div className="col-12">
+                <div className="table-responsive-lg">
+                  <table className="table table-hover table-sm">
+                    {svTableHead}
+                    {svTableBody}
+                  </table>
+                </div>
+              </div>
+            </div>
+          </React.Fragment>
+        )}
       </React.Fragment>
     );
   }

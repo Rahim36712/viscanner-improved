@@ -817,8 +817,29 @@ function parseUploadedEntryTexts(entryTexts, props, options = {}) {
     ? parseLohRegionBed(entryTexts[lohRegionFilename])
     : [];
 
+  const severusVcfFilename =
+    Object.keys(entryTexts).find(
+      (filename) =>
+        filename.toLowerCase().endsWith(".vcf") &&
+        filename.toLowerCase().includes("severus")
+    ) ||
+    Object.keys(entryTexts).find((filename) =>
+      filename.toLowerCase().endsWith(".vcf")
+    );
+  const svVariants = severusVcfFilename
+    ? parseSeverusVcf(entryTexts[severusVcfFilename], { passOnly: true })
+    : [];
+
+  if (typeof window !== "undefined") {
+    window._viscannerSvVariants = svVariants;
+  }
+
   if (entryTexts["cna_short.txt"]) {
-    props.populateTable(parseHiglassData(entryTexts["cna_short.txt"]));
+    props.populateTable({
+      type: "hiscanner",
+      rows: parseHiglassData(entryTexts["cna_short.txt"]),
+      svVariants,
+    });
   }
 
   if (entryTexts["cna_long.txt"]) {
@@ -850,6 +871,7 @@ function parseUploadedEntryTexts(entryTexts, props, options = {}) {
       props.populateTable({
         type: "wakhan",
         rows: tableRows,
+        svVariants,
         maskedRegionsByBuild,
         availableCentromereBuilds,
       });
@@ -869,19 +891,23 @@ function parseUploadedEntryTexts(entryTexts, props, options = {}) {
     }
   }
 
-  const severusVcfFilename = Object.keys(entryTexts).find((filename) =>
-    filename.toLowerCase().endsWith(".vcf") &&
-    filename.toLowerCase().includes("severus")
-  );
-  if (severusVcfFilename) {
+  if (svVariants.length > 0) {
     updateWakhanStructuralVariationTrack(
       {
-        variants: parseSeverusVcf(entryTexts[severusVcfFilename], { passOnly: true }),
+        variants: svVariants,
         matchedIds: matchedSvIds,
       }
     );
   } else {
     updateWakhanStructuralVariationTrack({ variants: [], matchedIds: [] });
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("viscanner:sv-variants-loaded", {
+        detail: { variants: svVariants },
+      })
+    );
   }
 
   if (entryTexts["snp.txt"]) {
