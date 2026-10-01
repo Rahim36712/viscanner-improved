@@ -18,6 +18,7 @@ import {
   safeMoveTo,
   safeLineTo,
   safeDrawRect,
+  safeDrawCircle,
   logDevSkip,
 } from "./safeRendering";
 
@@ -1193,7 +1194,6 @@ function WakhanCoverageTrack(HGC, ...args) {
       }
       const hp1Color = this.HGC.utils.colorToHex(HP1_POINT_COLOR);
       const hp2Color = this.HGC.utils.colorToHex(HP2_POINT_COLOR);
-      const halfDotSize = COVERAGE_DOT_SIZE / 2;
       const { leftAxisX, rightAxisX } = this.metrics();
       const rawWidth = Math.max(1, this.dimensions ? this.dimensions[0] : 1);
       const plotWidth = rightAxisX - leftAxisX;
@@ -1213,9 +1213,15 @@ function WakhanCoverageTrack(HGC, ...args) {
         return;
       }
 
-      // 2. High-performance screen-pixel column deduplication
-      // If we have more points than 1.5x the screen width, group by screen pixel column
-      const shouldCluster = inViewRows.length > plotWidth * 1.5;
+      // 2. Adaptive dot size and alpha scaling
+      const pointsPerPixel = inViewRows.length / plotWidth;
+      const shouldCluster = pointsPerPixel > 1.5;
+
+      // Dynamic radius: 1.0px in wide chromosome view smoothly scaling up to 2.0px when zoomed in
+      const radius = Math.max(1.0, Math.min(2.0, 2.0 - (pointsPerPixel - 1.0) * 0.25));
+
+      // Dynamic alpha: ~0.24-0.30 in wide view (preventing opaque solid blocks) up to 0.65 when zoomed in
+      const alpha = Math.max(0.24, Math.min(0.65, 0.65 / Math.sqrt(Math.max(1, pointsPerPixel * 0.8))));
 
       const hp1PointsToDraw = [];
       const hp2PointsToDraw = [];
@@ -1240,7 +1246,8 @@ function WakhanCoverageTrack(HGC, ...args) {
           }
         }
       } else {
-        // Zoomed out: cluster points by integer screen pixel column X to eliminate massive overdraw
+        // Zoomed out: Stratified density sampling across each screen pixel column
+        // Collect points per integer pixel column
         const hp1ByPixel = new Map();
         const hp2ByPixel = new Map();
 
@@ -1254,67 +1261,78 @@ function WakhanCoverageTrack(HGC, ...args) {
 
           const hp1Y = this.yCopyNumber(row.hp1CopyNumberEquivalent, 1);
           if (hp1Y !== null && isFiniteNumber(hp1Y)) {
-            const existing = hp1ByPixel.get(px);
-            if (!existing) {
-              hp1ByPixel.set(px, { min: hp1Y, max: hp1Y });
-            } else {
-              if (hp1Y < existing.min) existing.min = hp1Y;
-              if (hp1Y > existing.max) existing.max = hp1Y;
+            let list = hp1ByPixel.get(px);
+            if (!list) {
+              list = [];
+              hp1ByPixel.set(px, list);
             }
+            list.push(hp1Y);
           }
 
           const hp2Y = this.yCopyNumber(row.hp2CopyNumberEquivalent, 2);
           if (hp2Y !== null && isFiniteNumber(hp2Y)) {
-            const existing = hp2ByPixel.get(px);
-            if (!existing) {
-              hp2ByPixel.set(px, { min: hp2Y, max: hp2Y });
-            } else {
-              if (hp2Y < existing.min) existing.min = hp2Y;
-              if (hp2Y > existing.max) existing.max = hp2Y;
+            let list = hp2ByPixel.get(px);
+            if (!list) {
+              list = [];
+              hp2ByPixel.set(px, list);
             }
+            list.push(hp2Y);
           }
         }
 
-        hp1ByPixel.forEach((bounds, px) => {
-          hp1PointsToDraw.push({ x: px, y: bounds.min });
-          if (bounds.max - bounds.min >= 3) {
-            hp1PointsToDraw.push({ x: px, y: bounds.max });
+        const sampleYList = (yList, px, outList) => {
+          if (yList.length <= 3) {
+            for (let j = 0; j < yList.length; j++) {
+              outList.push({ x: px, y: yList[j] });
+            }
+            return;
           }
+          yList.sort((a, b) => a - b);
+          const min = yList[0];
+          const max = yList[yList.length - 1];
+          const mid = yList[Math.floor(yList.length / 2)];
+
+          if (max - min < 2) {
+            outList.push({ x: px, y: mid });
+          } else {
+            outList.push({ x: px, y: min });
+            outList.push({ x: px, y: mid });
+            outList.push({ x: px, y: max });
+          }
+        };
+
+        hp1ByPixel.forEach((yList, px) => {
+          sampleYList(yList, px, hp1PointsToDraw);
         });
 
-        hp2ByPixel.forEach((bounds, px) => {
-          hp2PointsToDraw.push({ x: px, y: bounds.min });
-          if (bounds.max - bounds.min >= 3) {
-            hp2PointsToDraw.push({ x: px, y: bounds.max });
-          }
+        hp2ByPixel.forEach((yList, px) => {
+          sampleYList(yList, px, hp2PointsToDraw);
         });
       }
 
-      // Draw HP1 points in single fill pass
-      this.coverageGraphics.beginFill(hp1Color, 0.58);
+      // Draw HP1 points in single fill pass as true circular dots
+      this.coverageGraphics.beginFill(hp1Color, alpha);
       for (let i = 0; i < hp1PointsToDraw.length; i++) {
         const pt = hp1PointsToDraw[i];
-        safeDrawRect(
+        safeDrawCircle(
           this.coverageGraphics,
-          pt.x - halfDotSize,
-          pt.y - halfDotSize,
-          COVERAGE_DOT_SIZE,
-          COVERAGE_DOT_SIZE,
+          pt.x,
+          pt.y,
+          radius,
           "drawCoveragePoints:hp1"
         );
       }
       this.coverageGraphics.endFill();
 
-      // Draw HP2 points in single fill pass
-      this.coverageGraphics.beginFill(hp2Color, 0.58);
+      // Draw HP2 points in single fill pass as true circular dots
+      this.coverageGraphics.beginFill(hp2Color, alpha);
       for (let i = 0; i < hp2PointsToDraw.length; i++) {
         const pt = hp2PointsToDraw[i];
-        safeDrawRect(
+        safeDrawCircle(
           this.coverageGraphics,
-          pt.x - halfDotSize,
-          pt.y - halfDotSize,
-          COVERAGE_DOT_SIZE,
-          COVERAGE_DOT_SIZE,
+          pt.x,
+          pt.y,
+          radius,
           "drawCoveragePoints:hp2"
         );
       }
