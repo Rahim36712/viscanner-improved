@@ -205,7 +205,7 @@ describe("CnvTable Component - Dual Tab System & Inspection", () => {
     expect(tableInstance.state.svSortedByOrder).toBe("desc");
   });
 
-  test("clicking the eye icon on a Breakpoint row calls goToBreakpoint", () => {
+  test("clicking the eye icon on a Breakpoint row calls goToBreakpoint with variant ID and dispatches inspect event", () => {
     let tableInstance;
     ReactDOM.render(
       <CnvTable
@@ -224,9 +224,74 @@ describe("CnvTable Component - Dual Tab System & Inspection", () => {
     const eyeIcon = container.querySelector("tbody tr td i.fa-eye");
     expect(eyeIcon).not.toBeNull();
 
+    const dispatchSpy = jest.spyOn(window, "dispatchEvent");
     const goToSpy = jest.spyOn(tableInstance, "goToBreakpoint");
     eyeIcon.click();
-    expect(goToSpy).toHaveBeenCalledWith("chr1", 120000, "chr1", 150000, "DEL", expect.any(String));
+    expect(goToSpy).toHaveBeenCalledWith("chr1", 120000, "chr1", 150000, "DEL", expect.any(String), "sv_1");
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "viscanner:inspect-variant",
+        detail: expect.objectContaining({ id: "sv_1", chr: "chr1", pos: 120000 }),
+      })
+    );
+    dispatchSpy.mockRestore();
+  });
+
+  test("renders IMDb-style numbered pagination below the table with page count hover info", () => {
+    let tableInstance;
+    ReactDOM.render(
+      <CnvTable
+        ref={(inst) => {
+          tableInstance = inst;
+        }}
+      />,
+      container
+    );
+
+    // Create 45 breakpoint items (with PAGE_SIZE=20 -> 3 pages)
+    const svList = [];
+    for (let i = 1; i <= 45; i++) {
+      svList.push({
+        id: `sv_${i}`,
+        chr: "chr1",
+        pos: 1000 * i,
+        chr2: "chr1",
+        pos2: 1000 * i + 500,
+        type: "DEL",
+        svlen: 500,
+        hp: "1",
+        vaf: "0.5",
+      });
+    }
+    tableInstance.populateSvVariants(svList);
+    tableInstance.setState({ activeTab: "breakpoints" });
+
+    // Check pagination exists below table
+    const paginationNav = container.querySelector("nav[aria-label='Table pagination']");
+    expect(paginationNav).not.toBeNull();
+
+    // Check total page text with hover
+    const pageInfo = container.querySelector("div[title*='Total 3 pages']");
+    expect(pageInfo).not.toBeNull();
+    expect(pageInfo.textContent).toContain("Page 1 of");
+    expect(pageInfo.textContent).toContain("3");
+    expect(pageInfo.textContent).toContain("(45 items)");
+
+    // Check numbered buttons: Prev, 1, 2, 3, Next
+    const pageButtons = container.querySelectorAll("ul.pagination li.page-item button.page-link");
+    expect(pageButtons.length).toBe(5); // Prev, 1, 2, 3, Next
+    expect(pageButtons[1].textContent).toBe("1");
+    expect(pageButtons[2].textContent).toBe("2");
+    expect(pageButtons[3].textContent).toBe("3");
+
+    // Clicking page 2 updates svTablePage and active class
+    pageButtons[2].click();
+    expect(tableInstance.state.svTablePage).toBe(1);
+
+    // Clicking Next jumps to page 3
+    const nextBtn = container.querySelector("ul.pagination li.page-item:last-child button.page-link");
+    nextBtn.click();
+    expect(tableInstance.state.svTablePage).toBe(2);
   });
 
   test("exportCsv works for breakpoints without errors", () => {

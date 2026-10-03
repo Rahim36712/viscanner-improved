@@ -102,6 +102,19 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       this.hp2Count = 0;
       this.unphasedCount = 0;
       this.isOnlyUnphased = false;
+      this.inspectedVariantId = null;
+
+      this.handleInspectVariant = (e) => {
+        if (e && e.detail && e.detail.id) {
+          this.inspectedVariantId = e.detail.id;
+          this.resetCache();
+          this.updateExistingGraphics();
+          this.animate();
+        }
+      };
+      if (typeof window !== "undefined") {
+        window.addEventListener("viscanner:inspect-variant", this.handleInspectVariant);
+      }
 
       this.initTrack();
 
@@ -435,50 +448,60 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         if (!isValidVariant(variant)) {
           return false;
         }
-        if (this.isOnlyUnphased) {
-          if (this.hpFilter === "1") {
-            // Track 1 renders all unphased variants (hp !== "1" and hp !== "2")
-            if (variant.hp === "1" || variant.hp === "2") {
+
+        const isInspected =
+          this.inspectedVariantId &&
+          (variant.id === this.inspectedVariantId || variant.mateId === this.inspectedVariantId);
+
+        if (!isInspected) {
+          if (this.isOnlyUnphased) {
+            if (this.hpFilter === "1") {
+              // Track 1 renders all unphased variants (hp !== "1" and hp !== "2")
+              if (variant.hp === "1" || variant.hp === "2") {
+                return false;
+              }
+            } else if (this.hpFilter === "2") {
+              // Track 2 renders no variants for unphased datasets
               return false;
             }
-          } else if (this.hpFilter === "2") {
-            // Track 2 renders no variants for unphased datasets
+          } else {
+            if (this.hpFilter && variant.hp !== this.hpFilter) {
+              return false;
+            }
+            if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
+              return false;
+            }
+          }
+          if (passOnly && variant.filter !== "PASS") {
             return false;
           }
-        } else {
-          if (this.hpFilter && variant.hp !== this.hpFilter) {
+          if (variant.type !== "BND" && variant.type !== "INS" && variantLength(variant) < minLength) {
             return false;
           }
-          if (this.hpLaneMode && variant.hp !== "1" && variant.hp !== "2") {
+          const maxLength = this.maxVariantLength;
+          if (maxLength && variant.chr === variant.chr2 && variantLength(variant) < maxLength) {
             return false;
           }
-        }
-        if (passOnly && variant.filter !== "PASS") {
-          return false;
-        }
-        if (variantLength(variant) < minLength) {
-          return false;
-        }
-        const maxLength = this.maxVariantLength;
-        if (maxLength && variant.chr === variant.chr2 && variantLength(variant) < maxLength) {
-          return false;
-        }
-        if (this.visibleTypes[variant.type] === false) {
-          return false;
-        }
-        if (
-          this.svMode === "matched" &&
-          this.matchedIds.size > 0 &&
-          !this.matchedIds.has(variant.id) &&
-          !this.matchedIds.has(variant.mateId)
-        ) {
-          return false;
+          if (this.visibleTypes[variant.type] === false) {
+            return false;
+          }
+          if (
+            this.svMode === "matched" &&
+            this.matchedIds.size > 0 &&
+            !this.matchedIds.has(variant.id) &&
+            !this.matchedIds.has(variant.mateId)
+          ) {
+            return false;
+          }
         }
 
-        // Viewport culling: skip if completely outside visible genomic range
+        // Viewport culling: keep if endpoints in range OR arc spans across the viewport
+        const minAbs = Math.min(variant.startAbs, variant.endAbs);
+        const maxAbs = Math.max(variant.startAbs, variant.endAbs);
         return (
           (variant.startAbs >= fromX - endpointPadding && variant.startAbs <= toX + endpointPadding) ||
-          (variant.endAbs >= fromX - endpointPadding && variant.endAbs <= toX + endpointPadding)
+          (variant.endAbs >= fromX - endpointPadding && variant.endAbs <= toX + endpointPadding) ||
+          (minAbs <= fromX && maxAbs >= toX)
         );
       });
       this.previousFromX = fromX;
@@ -571,7 +594,12 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       }
 
       const steps = span > 280 ? 30 : 22;
-      this.variantGraphics.lineStyle(SV_CONFIG.ARC_LINE_WIDTH, color, ARC_ALPHA);
+      const isInspected =
+        this.inspectedVariantId &&
+        (variant.id === this.inspectedVariantId || variant.mateId === this.inspectedVariantId);
+      const arcWidth = isInspected ? SV_CONFIG.ARC_LINE_WIDTH + 2.5 : SV_CONFIG.ARC_LINE_WIDTH;
+      const arcAlpha = isInspected ? 1.0 : ARC_ALPHA;
+      this.variantGraphics.lineStyle(arcWidth, color, arcAlpha);
 
       for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
@@ -672,7 +700,12 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
         return;
       }
 
-      this.variantGraphics.lineStyle(SV_CONFIG.MARKER_LINE_WIDTH, color, MARKER_ALPHA);
+      const isInspected =
+        this.inspectedVariantId &&
+        (variant.id === this.inspectedVariantId || variant.mateId === this.inspectedVariantId);
+      const markerWidth = isInspected ? SV_CONFIG.MARKER_LINE_WIDTH + 2.5 : SV_CONFIG.MARKER_LINE_WIDTH;
+      const markerAlpha = isInspected ? 1.0 : MARKER_ALPHA;
+      this.variantGraphics.lineStyle(markerWidth, color, markerAlpha);
       safeMoveTo(this.variantGraphics, x, markerTop, "drawMarker:moveTo");
       safeLineTo(this.variantGraphics, x, markerBottom, "drawMarker:lineTo");
 
@@ -873,6 +906,13 @@ function WakhanStructuralVariationTrack(HGC, ...args) {
       super.zoomed(newXScale, newYScale);
       this.updateExistingGraphics();
       this.animate();
+    }
+
+    remove() {
+      if (typeof window !== "undefined" && this.handleInspectVariant) {
+        window.removeEventListener("viscanner:inspect-variant", this.handleInspectVariant);
+      }
+      super.remove();
     }
   }
 

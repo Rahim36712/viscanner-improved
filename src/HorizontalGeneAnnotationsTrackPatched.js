@@ -285,6 +285,7 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
     });
 
     // Smart 1D Screen-Space Collision Detection in Mapped Coordinates
+    // Prevents text overlapping and keeps labels cleanly aligned with their strand
     const occupiedPlus = [];
     const occupiedMinus = [];
 
@@ -304,6 +305,11 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
           collides = true;
           break;
         }
+      }
+
+      // Reset any vertical shifts
+      if (text._originalY !== undefined) {
+        text.position.y = text._originalY;
       }
 
       // When unfiltered, hide colliding gene labels to prevent text overlapping!
@@ -355,10 +361,13 @@ function HorizontalGeneAnnotationsTrackPatched(HGC, ...args) {
         const [minX, minY, maxX, maxY] = box;
         const width = maxX - minX;
         const height = maxY - minY;
+        const bgY = text.position && typeof text.position.y === "number"
+          ? text.position.y - height / 2
+          : minY - height / 2;
 
         tile.textBgGraphics.drawRect(
           localCenterX - width / 2,
-          minY - height / 2,
+          bgY,
           width,
           height
         );

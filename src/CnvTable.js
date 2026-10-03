@@ -118,8 +118,43 @@ export class CnvTable extends React.PureComponent {
       ) {
         this.populateSvVariants(window._viscannerSvVariants);
       }
+
+      // Pre-cache ChromosomeInfo immediately so eye icon clicks never wait for network!
+      if (!this.chromInfo && !window._viscannerChromInfo && typeof ChromosomeInfo === "function") {
+        try {
+          const p = ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv");
+          if (p && typeof p.then === "function") {
+            p.then((ci) => {
+              this.chromInfo = ci;
+              window._viscannerChromInfo = ci;
+            }).catch(() => {});
+          }
+        } catch (e) {}
+      }
     }
   }
+
+  getChromInfo = () => {
+    if (this.chromInfo) return this.chromInfo;
+    if (typeof window !== "undefined" && window._viscannerChromInfo) {
+      this.chromInfo = window._viscannerChromInfo;
+      return this.chromInfo;
+    }
+    const hgc = typeof window !== "undefined" && window.hgc && window.hgc.current;
+    if (hgc && hgc.api) {
+      try {
+        const track =
+          hgc.api.getTrackObject("aa", "wakhan-coverage-track") ||
+          hgc.api.getTrackObject("aa", "wakhan-sv-track");
+        if (track && track.chromInfo) {
+          this.chromInfo = track.chromInfo;
+          if (typeof window !== "undefined") window._viscannerChromInfo = track.chromInfo;
+          return this.chromInfo;
+        }
+      } catch (e) {}
+    }
+    return null;
+  };
 
   componentWillUnmount() {
     if (typeof window !== "undefined" && this.handleSvVariantsLoaded) {
@@ -148,8 +183,14 @@ export class CnvTable extends React.PureComponent {
 
   previousPage = () => {
     this.setState((prevState) => ({
-      tablePage: prevState.tablePage - 1,
+      tablePage: Math.max(0, prevState.tablePage - 1),
     }));
+  };
+
+  goToPage = (page) => {
+    this.setState({
+      tablePage: Math.max(0, page),
+    });
   };
 
   sortTable = (value) => {
@@ -282,8 +323,126 @@ export class CnvTable extends React.PureComponent {
 
   previousSvPage = () => {
     this.setState((prevState) => ({
-      svTablePage: prevState.svTablePage - 1,
+      svTablePage: Math.max(0, prevState.svTablePage - 1),
     }));
+  };
+
+  goToSvPage = (page) => {
+    this.setState({
+      svTablePage: Math.max(0, page),
+    });
+  };
+
+  renderPagination = (currentPage, totalItems, pageSize, onPageChange) => {
+    const totalPages = Math.ceil(totalItems / pageSize);
+    if (totalPages <= 1 && totalItems === 0) return null;
+
+    const pages = [];
+    const maxVisiblePages = 7;
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 0; i < totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // IMDb-style smart pagination with numbered tabs and ellipsis
+      if (currentPage < 4) {
+        for (let i = 0; i < 5; i++) pages.push(i);
+        pages.push("ellipsis-right");
+        pages.push(totalPages - 1);
+      } else if (currentPage >= totalPages - 4) {
+        pages.push(0);
+        pages.push("ellipsis-left");
+        for (let i = totalPages - 5; i < totalPages; i++) pages.push(i);
+      } else {
+        pages.push(0);
+        pages.push("ellipsis-left");
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push("ellipsis-right");
+        pages.push(totalPages - 1);
+      }
+    }
+
+    return (
+      <div className="d-flex flex-wrap justify-content-between align-items-center mt-3 mb-2 px-3 py-2 bg-light border rounded">
+        <div
+          className="text-muted small py-1"
+          title={`Total ${totalPages} pages (${totalItems} total items)`}
+          style={{ cursor: "default" }}
+        >
+          <span>
+            Page <strong className="text-dark">{currentPage + 1}</strong> of{" "}
+            <span
+              className="badge badge-secondary ml-1 mr-1"
+              style={{ fontSize: "12px", cursor: "pointer" }}
+              title={`Total pages: ${totalPages}`}
+            >
+              {totalPages}
+            </span>
+          </span>
+          <span className="text-secondary ml-1">({totalItems} items)</span>
+        </div>
+
+        <nav aria-label="Table pagination">
+          <ul className="pagination pagination-sm mb-0">
+            <li className={`page-item ${currentPage === 0 ? "disabled" : ""}`}>
+              <button
+                type="button"
+                className="page-link"
+                onClick={() => currentPage > 0 && onPageChange(currentPage - 1)}
+                disabled={currentPage === 0}
+                aria-label="Previous page"
+                style={{ cursor: currentPage === 0 ? "not-allowed" : "pointer" }}
+              >
+                &laquo; Prev
+              </button>
+            </li>
+
+            {pages.map((p, idx) => {
+              if (typeof p === "string") {
+                return (
+                  <li key={`${p}-${idx}`} className="page-item disabled">
+                    <span className="page-link" style={{ cursor: "default" }}>&hellip;</span>
+                  </li>
+                );
+              }
+              const isActive = p === currentPage;
+              return (
+                <li
+                  key={p}
+                  className={`page-item ${isActive ? "active font-weight-bold" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="page-link"
+                    onClick={() => onPageChange(p)}
+                    title={`Page ${p + 1} of ${totalPages}`}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {p + 1}
+                  </button>
+                </li>
+              );
+            })}
+
+            <li className={`page-item ${currentPage >= totalPages - 1 ? "disabled" : ""}`}>
+              <button
+                type="button"
+                className="page-link"
+                onClick={() => currentPage < totalPages - 1 && onPageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages - 1}
+                aria-label="Next page"
+                style={{ cursor: currentPage >= totalPages - 1 ? "not-allowed" : "pointer" }}
+              >
+                Next &raquo;
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    );
   };
 
   selectSvChrom = (selectedChrom) => {
@@ -572,7 +731,7 @@ export class CnvTable extends React.PureComponent {
       const rect = targetElement.getBoundingClientRect();
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       window.scrollTo({
-        top: scrollTop + rect.top + 90,
+        top: Math.max(0, scrollTop + rect.top - 15),
         behavior: "smooth",
       });
     }
@@ -627,8 +786,9 @@ export class CnvTable extends React.PureComponent {
       }
     };
 
-    if (this.chromInfo) {
-      executeZoom(this.chromInfo);
+    const chromInfo = this.getChromInfo();
+    if (chromInfo) {
+      executeZoom(chromInfo);
       return;
     }
 
@@ -637,9 +797,10 @@ export class CnvTable extends React.PureComponent {
         ? ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
         : null;
       if (p && typeof p.then === "function") {
-        p.then((chromInfo) => {
-          this.chromInfo = chromInfo;
-          executeZoom(chromInfo);
+        p.then((ci) => {
+          this.chromInfo = ci;
+          if (typeof window !== "undefined") window._viscannerChromInfo = ci;
+          executeZoom(ci);
         }).catch((err) => {
           console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
           executeZoom(null);
@@ -652,9 +813,17 @@ export class CnvTable extends React.PureComponent {
     executeZoom(null);
   };
 
-  goToBreakpoint = (chr, pos, chr2, pos2, type, rowKey) => {
+  goToBreakpoint = (chr, pos, chr2, pos2, type, rowKey, variantId) => {
     if (rowKey) {
       this.setState({ activeRowKey: rowKey });
+    }
+
+    if (variantId && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("viscanner:inspect-variant", {
+          detail: { id: variantId, chr, pos, chr2, pos2, type },
+        })
+      );
     }
 
     const hgc = window.hgc && window.hgc.current;
@@ -665,7 +834,12 @@ export class CnvTable extends React.PureComponent {
 
     const targetElement = document.getElementById("sec:visualization");
     if (targetElement) {
-      targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      const rect = targetElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      window.scrollTo({
+        top: Math.max(0, scrollTop + rect.top - 15),
+        behavior: "smooth",
+      });
     }
 
     const executeZoom = (chromInfo) => {
@@ -678,48 +852,69 @@ export class CnvTable extends React.PureComponent {
         const posNum = Math.max(0, Math.min(chrLength, Number(pos) || 0));
         const pos2Num = Number.isFinite(Number(pos2)) ? Math.max(0, Math.min(chrLength, Number(pos2))) : posNum;
 
-        let zoomStart;
-        let zoomEnd;
+        const chrToAbsFn = (chromInfo && typeof chromInfo.chrToAbs === "function")
+          ? (c, p) => chromInfo.chrToAbs([c, p])
+          : (c, p) => p;
 
-        const isIntraChrom = (!chr2 || chr2 === chr) && pos2Num !== posNum;
-        if (isIntraChrom) {
-          const minPos = Math.min(posNum, pos2Num);
-          const maxPos = Math.max(posNum, pos2Num);
-          const span = maxPos - minPos;
-          if (span < 50000) {
-            const center = (minPos + maxPos) / 2;
-            zoomStart = Math.max(0, Math.round(center - 25000));
-            zoomEnd = Math.min(chrLength, Math.round(center + 25000));
-          } else {
-            const pad = Math.round(span * 0.15);
-            zoomStart = Math.max(0, minPos - pad);
-            zoomEnd = Math.min(chrLength, maxPos + pad);
-          }
+        // Check if inter-chromosomal translocation across two different chromosomes
+        if (chr2 && chr2 !== chr) {
+          const chr2Length = chrSizes[chr2] || 250000000;
+          const clampedPos2 = Math.max(0, Math.min(chr2Length, pos2Num));
+          const abs1 = chrToAbsFn(chr, posNum);
+          const abs2 = chrToAbsFn(chr2, clampedPos2);
+          const minAbs = Math.min(abs1, abs2);
+          const maxAbs = Math.max(abs1, abs2);
+          const span = maxAbs - minAbs;
+          const pad = Math.max(50000, Math.round(span * 0.05));
+          const zoomStart = Math.max(0, minAbs - pad);
+          const zoomEnd = maxAbs + pad;
+          hgc.api.zoomTo(viewUid, zoomStart, zoomEnd, 0, 1000, 800);
+          return;
+        }
+
+        // Intra-chromosomal SV on the same chromosome
+        if (type === "INS" || posNum === pos2Num) {
+          // Point insertion or point breakend
+          const zoomStart = Math.max(0, Math.round(posNum - 25000));
+          const zoomEnd = Math.min(chrLength, Math.round(posNum + 25000));
+          const startAbs = chrToAbsFn(chr, zoomStart);
+          const endAbs = chrToAbsFn(chr, zoomEnd);
+          hgc.api.zoomTo(viewUid, startAbs, endAbs, 0, 1000, 800);
+          return;
+        }
+
+        // Deletion, Inversion, Duplication spanning a region
+        const minPos = Math.min(posNum, pos2Num);
+        const maxPos = Math.max(posNum, pos2Num);
+        const span = maxPos - minPos;
+        let zoomStart, zoomEnd;
+
+        if (span < 50000) {
+          const center = (minPos + maxPos) / 2;
+          zoomStart = Math.max(0, Math.round(center - 25000));
+          zoomEnd = Math.min(chrLength, Math.round(center + 25000));
         } else {
-          // Point SV (INS) or inter-chromosomal translocation (BND)
-          zoomStart = Math.max(0, Math.round(posNum - 25000));
-          zoomEnd = Math.min(chrLength, Math.round(posNum + 25000));
+          // 25% padding so the whole arc curve and both feet are completely framed
+          const pad = Math.round(span * 0.25);
+          zoomStart = Math.max(0, minPos - pad);
+          zoomEnd = Math.min(chrLength, maxPos + pad);
         }
 
         if (zoomEnd <= zoomStart + 100) {
           zoomEnd = Math.min(chrLength, zoomStart + 1000);
         }
 
-        const chrToAbsFn = (chromInfo && typeof chromInfo.chrToAbs === "function")
-          ? (c, p) => chromInfo.chrToAbs([c, p])
-          : (c, p) => p;
-
         const startAbs = chrToAbsFn(chr, zoomStart);
         const endAbs = chrToAbsFn(chr, zoomEnd);
-
         hgc.api.zoomTo(viewUid, startAbs, endAbs, 0, 1000, 800);
       } catch (e) {
         console.error("Error navigating to breakpoint in HiGlass:", e);
       }
     };
 
-    if (this.chromInfo) {
-      executeZoom(this.chromInfo);
+    const chromInfo = this.getChromInfo();
+    if (chromInfo) {
+      executeZoom(chromInfo);
       return;
     }
 
@@ -728,9 +923,10 @@ export class CnvTable extends React.PureComponent {
         ? ChromosomeInfo("https://s3.amazonaws.com/pkerp/data/hg19/chromSizes.tsv")
         : null;
       if (p && typeof p.then === "function") {
-        p.then((chromInfo) => {
-          this.chromInfo = chromInfo;
-          executeZoom(chromInfo);
+        p.then((ci) => {
+          this.chromInfo = ci;
+          if (typeof window !== "undefined") window._viscannerChromInfo = ci;
+          executeZoom(ci);
         }).catch((err) => {
           console.error("Error loading ChromosomeInfo for breakpoint inspection:", err);
           executeZoom(null);
@@ -924,31 +1120,6 @@ export class CnvTable extends React.PureComponent {
       );
     }
 
-    const navButtons = [];
-
-    if (
-      variantsToDisplay.length > PAGE_SIZE &&
-      (this.state.tablePage + 1) * PAGE_SIZE <= variantsToDisplay.length
-    ) {
-      navButtons.push(
-        <button className="btn btn-primary btn-sm" onClick={this.nextPage} key="next-btn">
-          {LABELS.cnvTable.nextButton}
-        </button>
-      );
-    }
-
-    if (this.state.tablePage > 0) {
-      navButtons.push(
-        <button
-          className="btn btn-primary btn-sm mx-2"
-          onClick={this.previousPage}
-          key="prev-btn"
-        >
-          {LABELS.cnvTable.previousButton}
-        </button>
-      );
-    }
-
     let message = "";
     if (variantsToDisplay.length > 0) {
       message = `Displaying variants ${
@@ -1076,7 +1247,7 @@ export class CnvTable extends React.PureComponent {
                     title="Inspect breakpoint in visualization"
                     style={{ cursor: "pointer", fontSize: "16px" }}
                     onClick={() =>
-                      this.goToBreakpoint(v.chr, v.pos, v.chr2, v.pos2, v.type, rowKey)
+                      this.goToBreakpoint(v.chr, v.pos, v.chr2, v.pos2, v.type, rowKey, v.id)
                     }
                   ></i>
                 </td>
@@ -1086,31 +1257,6 @@ export class CnvTable extends React.PureComponent {
         )}
       </tbody>
     );
-
-    const svNavButtons = [];
-
-    if (
-      svVariantsToDisplay.length > PAGE_SIZE &&
-      (this.state.svTablePage + 1) * PAGE_SIZE <= svVariantsToDisplay.length
-    ) {
-      svNavButtons.push(
-        <button className="btn btn-primary btn-sm" onClick={this.nextSvPage} key="next-sv-btn">
-          {LABELS.cnvTable.nextButton || "Next"}
-        </button>
-      );
-    }
-
-    if (this.state.svTablePage > 0) {
-      svNavButtons.push(
-        <button
-          className="btn btn-primary btn-sm mx-2"
-          onClick={this.previousSvPage}
-          key="prev-sv-btn"
-        >
-          {LABELS.cnvTable.previousButton || "Previous"}
-        </button>
-      );
-    }
 
     let svMessage = "";
     if (svVariantsToDisplay.length > 0) {
@@ -1225,17 +1371,16 @@ export class CnvTable extends React.PureComponent {
               {this.state.tableType === "wakhan" ? LABELS.cnvTable.wakhanTitle : LABELS.cnvTable.variantTitle}
             </div>
 
-            <div className="d-flex flex-row-reverse mb-2">
-              {navButtons}
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div className="text-muted small">{message}</div>
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm mx-2"
+                className="btn btn-outline-secondary btn-sm"
                 onClick={this.exportCsv}
               >
                 <i className="fa fa-download fas mr-1"></i>
                 {LABELS.cnvTable.exportCsvButton}
               </button>
-              <div className="pt-1 mx-2">{message}</div>
             </div>
             <div className="row">
               <div className="col-12">
@@ -1245,6 +1390,12 @@ export class CnvTable extends React.PureComponent {
                     {tableBody}
                   </table>
                 </div>
+                {this.renderPagination(
+                  this.state.tablePage,
+                  variantsToDisplay.length,
+                  PAGE_SIZE,
+                  this.goToPage
+                )}
               </div>
             </div>
           </React.Fragment>
@@ -1254,17 +1405,16 @@ export class CnvTable extends React.PureComponent {
               Structural Variation Breakpoints
             </div>
 
-            <div className="d-flex flex-row-reverse mb-2">
-              {svNavButtons}
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div className="text-muted small">{svMessage}</div>
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm mx-2"
+                className="btn btn-outline-secondary btn-sm"
                 onClick={this.exportCsv}
               >
                 <i className="fa fa-download fas mr-1"></i>
                 {LABELS.cnvTable.exportCsvButton}
               </button>
-              <div className="pt-1 mx-2">{svMessage}</div>
             </div>
             <div className="row">
               <div className="col-12">
@@ -1274,6 +1424,12 @@ export class CnvTable extends React.PureComponent {
                     {svTableBody}
                   </table>
                 </div>
+                {this.renderPagination(
+                  this.state.svTablePage,
+                  svVariantsToDisplay.length,
+                  PAGE_SIZE,
+                  this.goToSvPage
+                )}
               </div>
             </div>
           </React.Fragment>
