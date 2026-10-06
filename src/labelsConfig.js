@@ -10,6 +10,12 @@
 export const LABELS = {
   // Main Navigation / Header
   appTitle: "HiScanner [Wakhan] visualization",
+  localRunCommands: [
+    "git clone https://github.com/wakhan-visualization/wakhan-visualization.github.io.git",
+    "cd wakhan-visualization.github.io",
+    "npm install",
+    "npm start",
+  ],
   visualizationSectionTitle: "Interactive visualization",
   visualizationSubtitle: "(Hold Shift + Left-Click Drag on the plot to zoom in; Drag normally to pan left/right)",
   exportPdfButton: "Export PDF",

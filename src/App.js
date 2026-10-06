@@ -4,6 +4,7 @@ import { Facets } from "./Facets";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { HiglassBrowser } from "./HiglassBrowser";
 import { CnvTable } from "./CnvTable";
+import { LocalRunInstructions } from "./LocalRunInstructions";
 import { fitToContent, scheduleFitToContent } from "./higlassLayout";
 import { LABELS, SV_CONFIG, TRACK_COLORS, UI_COLORS } from "./labelsConfig";
 import { DEFAULT_SETTINGS } from "./defaultSettings";
@@ -539,6 +540,7 @@ function App() {
         <h2 id="variant-view" className="text-center" style={{ color: UI_COLORS.appTitleColor }}>
           {LABELS.appTitle}
         </h2>
+        <LocalRunInstructions />
         <CnvTable />
 
         <div className="h3 mt-5 mb-1" id="sec:visualization" style={{ color: UI_COLORS.visualizationSectionTitleColor }}>
